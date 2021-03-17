@@ -1,0 +1,12 @@
+type Record implements Node {
+  id: ID!
+  name: String
+  group: Group
+  macAddr: MacAddr
+}
+
+type Group implements Node {
+  id: ID!
+  name: String
+  maxCount: Int
+}

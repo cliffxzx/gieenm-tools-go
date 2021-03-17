@@ -1,0 +1,8 @@
+type Announcement implements Node {
+  id: ID!
+  title: String
+  content: String
+  announcer: String
+  createdAt: Time
+  level: AnnounceLevel
+}

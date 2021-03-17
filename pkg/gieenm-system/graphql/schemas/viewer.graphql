@@ -1,0 +1,6 @@
+type Viewer {
+  user: User
+  records: [Record!]
+  groups: [Group!]
+  announcements: [Announcement!]
+}

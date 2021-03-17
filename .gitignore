@@ -1,18 +1,19 @@
-
 # OS generated files #
-######################
 .DS_Store
 .DS_Store?
-.vscode
 
 # Logs #
-######################
 *.log
 
 # SENSITVE DATA #
 .gitconfig
 .env
+*_private_seeder.*.sql
 cert/
 
 # BUILD #
-./gin-boilerplate
+.build
+
+# Debugs #
+.vscode
+modd.conf

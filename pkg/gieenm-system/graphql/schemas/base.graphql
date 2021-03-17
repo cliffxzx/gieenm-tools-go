@@ -1,0 +1,35 @@
+directive @goModel(
+  model: String
+  models: [String!]
+) on OBJECT | INPUT_OBJECT | SCALAR | ENUM | INTERFACE | UNION
+
+directive @goField(
+  forceResolver: Boolean
+  name: String
+) on INPUT_FIELD_DEFINITION | FIELD_DEFINITION
+
+interface Node {
+  id: ID!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+input PageInput {
+  cursor: String
+  count: Int
+  above: Boolean
+}
+
+scalar Float64
+scalar Int64
+scalar Time
+scalar Upload
+scalar Role
+scalar IPAddr
+scalar MacAddr
+scalar AnnounceLevel

@@ -1,0 +1,43 @@
+type Mutation {
+  login(input: LoginInput!): AuthPayload
+  logout: Boolean
+  register(input: RegisterInput!): AuthPayload
+  addRecords(input: [AddRecordInput!]): [Record!]
+  setRecords(input: [SetRecordInput!]): [Record!]
+  delRecords(input: [DelRecordInput!]): Boolean
+}
+
+type AuthPayload {
+  token: String
+  user: User
+}
+
+input LoginInput {
+  email: String
+  studentID: String
+  password: String!
+}
+
+input RegisterInput {
+  name: String!
+  email: String!
+  studentID: String
+  password: String!
+}
+
+input AddRecordInput {
+  groupID: ID!
+  name: String!
+  macAddr: MacAddr!
+}
+
+input SetRecordInput {
+  id: ID!
+  name: String
+  groupID: ID
+  macAddr: MacAddr
+}
+
+input DelRecordInput {
+  id: ID!
+}
