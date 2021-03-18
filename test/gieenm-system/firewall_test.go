@@ -9,6 +9,11 @@ import (
 
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/database"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall"
+	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/common"
+	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/group"
+	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/limit"
+	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/record"
+	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/sync"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/scalars"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/user"
 	"github.com/cliffxzx/gieenm-tools/pkg/utils"
@@ -52,29 +57,27 @@ func fakeFirewall() *firewall.Firewall {
 		Name:     pointy.String("test"),
 		Username: pointy.String("test"),
 		Password: pointy.String("test"),
-		Enable:   pointy.Bool(true),
 		Host:     &uurl,
 	}
 
 	return &f
 }
 
-func fakeGroup() *firewall.RecordGroup {
-	g := &[]firewall.RecordGroup{
+func fakeGroup() *group.Group {
+	g := &[]group.Group{
 		{
 			Name:       pointy.String("testFake"),
-			NusoftID:   &firewall.NusoftID{Serial: pointy.Int64(1), Time: pointy.Int64(1)},
+			NusoftID:   &common.NusoftID{Serial: pointy.Int64(1), Time: pointy.Int64(1)},
 			FirewallID: fakeFirewall().ID,
-			Enable:     pointy.Bool(true),
 		},
 	}
 
-	firewall.AddRecordGroups(g)
+	group.Adds(g)
 
 	return &(*g)[0]
 }
 
-func fakeRecords(us *user.User, group *firewall.RecordGroup) *[]firewall.Record {
+func fakeRecords(us *user.User, group *group.Group) *[]record.Record {
 	ipAddr, ip, _ := net.ParseCIDR("192.0.0.1/22")
 	ip.IP = ipAddr
 	fip := scalars.IPAddr(*ip)
@@ -85,20 +88,18 @@ func fakeRecords(us *user.User, group *firewall.RecordGroup) *[]firewall.Record 
 	fmac := scalars.MacAddr(mac)
 	mac2, _ := net.ParseMAC("00-00-5e-00-53-02")
 	fmac2 := scalars.MacAddr(mac2)
-	u := []firewall.Record{{
+	u := []record.Record{{
 		Name:     pointy.String("test-1"),
-		NusoftID: &firewall.NusoftID{Serial: pointy.Int64(1), Time: pointy.Int64(1)},
+		NusoftID: &common.NusoftID{Serial: pointy.Int64(1), Time: pointy.Int64(1)},
 		IPAddr:   &fip,
 		MacAddr:  &fmac,
-		Enable:   pointy.Bool(true),
 		User:     us,
 		Group:    group,
 	}, {
 		Name:     pointy.String("test-2"),
-		NusoftID: &firewall.NusoftID{Serial: pointy.Int64(2), Time: pointy.Int64(2)},
+		NusoftID: &common.NusoftID{Serial: pointy.Int64(2), Time: pointy.Int64(2)},
 		IPAddr:   &fip2,
 		MacAddr:  &fmac2,
-		Enable:   pointy.Bool(true),
 		User:     us,
 		Group:    group,
 	}}
@@ -107,21 +108,21 @@ func fakeRecords(us *user.User, group *firewall.RecordGroup) *[]firewall.Record 
 }
 
 func TestInitFirewalls(t *testing.T) {
-	fw, err := firewall.InitFirewalls()
+	err := firewall.InitFirewalls()
 	if err != nil {
 		t.Logf("%s", err)
 	}
 
-	t.Logf("\n%s", utils.SliceToJSON(*fw))
+	t.Logf("\n%s", utils.SliceToJSON(firewall.GetFirewalls()))
 }
 
 // TODO: need implements
 func TestAddUserRecordLimits(t *testing.T) {
-	err := firewall.AddUserRecordLimits(&[]firewall.UserRecordLimit{
+	err := limit.Adds(&[]limit.Limit{
 		{
-			MaxCount: pointy.Int(3),
-			User:     fakeStudent(),
-			Group:    fakeGroup(),
+			RecordMaxCount: pointy.Int(3),
+			User:           fakeStudent(),
+			Group:          fakeGroup(),
 		},
 	})
 	if err != nil {
@@ -132,7 +133,7 @@ func TestAddUserRecordLimits(t *testing.T) {
 func TestGetRecordsByUserID(t *testing.T) {
 	u := fakeStudent()
 	_ = u
-	records, err := firewall.GetRecordsByUserID(1)
+	records, err := record.GetsByUserID(1)
 	if err != nil {
 		t.Logf("%s", err)
 	}
@@ -145,7 +146,7 @@ func TestAddRecords(t *testing.T) {
 	g := fakeGroup()
 
 	r := fakeRecords(u, g)
-	err := firewall.AddRecords(r)
+	err := record.Adds(r)
 	if err != nil {
 		t.Logf("%s", err)
 	}
@@ -155,7 +156,7 @@ func TestDelRecords(t *testing.T) {
 	u := fakeStudent()
 	g := fakeGroup()
 	r := fakeRecords(u, g)
-	err := firewall.DelRecords(r)
+	err := record.Dels(r)
 	if err != nil {
 		t.Logf("%s", err)
 	}
@@ -164,8 +165,54 @@ func TestDelRecords(t *testing.T) {
 }
 
 func TestNusoftToFirewall(t *testing.T) {
-	fws, _ := firewall.InitFirewalls()
-	err := fws.NusoftToFirewall()
+	err := firewall.InitFirewalls()
+	if err != nil {
+		t.Logf("%s", err)
+	}
+
+	subnetRaw := map[string]string{
+		// 109
+		"20180205214124,3": "192.168.1.0/24",
+		// 114
+		"20180203234922,1": "192.168.2.0/24",
+		// 115-1,115-2
+		"20180204001228,2": "192.168.3.0/24",
+		// 1f 管制群組
+		"20190925091129,4": "192.168.0.0/16",
+		// 206
+		"20170629102323,1": "192.168.1.0/24",
+		// 208
+		"20170629102325,2": "192.168.2.0/24",
+		// 311A
+		"20170629102327,3": "192.168.3.0/24",
+		// 2f 管制群組
+		"20200427155607,4": "192.168.0.0/16",
+		// 305-306
+		"20170629105419,1": "192.168.1.0/24",
+		// 307-310
+		"20170629114059,2": "192.168.2.0/24",
+		// 405
+		"20170629200244,3": "192.168.3.0/24",
+		// 405-1
+		"20180202235136,2": "192.168.1.0/24",
+		// 407-408
+		"20170629110845,3": "192.168.2.0/24",
+		// 410
+		"20180202225649,1": "192.168.3.0/24",
+		// 4f 管制群組
+		"20190615104456,1": "192.168.0.0/16",
+		// gieenm-tools-tokenStr
+		"20210318222159,2": "192.168.2.0/16",
+	}
+
+	defaultSubnets := map[string]*scalars.IPAddr{}
+	for key, raw := range subnetRaw {
+		_, subnet, _ := net.ParseCIDR(raw)
+		tmp := scalars.IPAddr(*subnet)
+		defaultSubnets[key] = &tmp
+	}
+
+	err = sync.SyncNusoftToDatabase(defaultSubnets)
 	if err != nil {
 		t.Logf("%s", err)
 	}

@@ -2,9 +2,9 @@ type Mutation {
   login(input: LoginInput!): AuthPayload
   logout: Boolean
   register(input: RegisterInput!): AuthPayload
-  addRecords(input: [AddRecordInput!]): [Record!]
-  setRecords(input: [SetRecordInput!]): [Record!]
-  delRecords(input: [DelRecordInput!]): Boolean
+  addRecords(input: AddRecordInput!): Record
+  setRecords(input: SetRecordInput!): Record
+  delRecords(input: DelRecordInput!): Record
 }
 
 type AuthPayload {

@@ -25,10 +25,10 @@ func TestOnDebug(t *testing.T) {
 	LoadEnv()
 
 	database.Init()
-	fw, err := firewall.InitFirewalls()
+	err := firewall.InitFirewalls()
 	if err != nil {
 		t.Logf("%s", err)
 	}
 
-	t.Logf("\n%s", utils.SliceToJSON(*fw))
+	t.Logf("\n%s", utils.SliceToJSON(*firewall.GetFirewalls()))
 }

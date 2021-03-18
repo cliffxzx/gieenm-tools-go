@@ -63,3 +63,25 @@ func (Sqls) GetsByUserID() string {
 		user_id = $1
 `
 }
+
+func (Sqls) GetsByUID() string {
+	return `
+	select
+		id, uid, nusoft_id, name, ip_addr, mac_addr, user_id, group_id, created_at, modified_at
+	from
+		records
+	where
+		uid = $1
+`
+}
+
+func (Sqls) GetsByGroupID() string {
+	return `
+	select
+		id, uid, nusoft_id, name, ip_addr, mac_addr, user_id, group_id, created_at, modified_at
+	from
+		records
+	where
+		group_id = $1
+`
+}

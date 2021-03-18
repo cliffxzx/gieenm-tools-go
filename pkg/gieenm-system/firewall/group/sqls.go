@@ -7,9 +7,21 @@ type Sqls struct{}
 func (Sqls) Gets() string {
 	return `
 	select
-		id, uid, name, nusoft_id, firewall_id, created_at, modified_at
+		id, uid, name, subnet, nusoft_id, firewall_id, created_at, modified_at
 	from
 		record_groups
+`
+}
+
+// GetByUID ...
+func (Sqls) GetByUID() string {
+	return `
+	select
+		id, uid, name, subnet, nusoft_id, firewall_id, created_at, modified_at
+	from
+		record_groups
+	where
+		uid = $1
 `
 }
 
@@ -26,8 +38,9 @@ func (Sqls) Adds() string {
 	do update set
 		uid = excluded.uid,
 		name = excluded.name,
+		subnet = excluded.subnet,
 		modified_at = excluded.modified_at
 	returning
-		id, uid, name, nusoft_id, firewall_id, created_at, modified_at
+		id, uid, name, subnet, nusoft_id, firewall_id, created_at, modified_at
 `
 }

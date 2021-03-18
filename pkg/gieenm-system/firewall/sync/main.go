@@ -2,6 +2,7 @@ package sync
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/common"
@@ -46,7 +47,7 @@ func addUnlimit(gs *[]group.Group, u *user.User) error {
 }
 
 // SyncNusoftToDatabase
-func SyncNusoftToDatabase() error {
+func SyncNusoftToDatabase(defaultSubnet map[string]*scalars.IPAddr) error {
 	groups := []group.Group{}
 	includes := [][]nusoft.Record{}
 	records := map[int64]*nusoft.Record{}
@@ -64,10 +65,13 @@ func SyncNusoftToDatabase() error {
 			}
 
 			includes = append(includes, *nsGroup.Includes)
+			nusoftID := (*common.NusoftID)(info.ID)
+
 			groups = append(groups, group.Group{
 				Name:       info.Name,
-				NusoftID:   (*common.NusoftID)(info.ID),
+				NusoftID:   nusoftID,
 				FirewallID: fw.ID,
+				Subnet:     defaultSubnet[fmt.Sprintf("%d,%d", *nusoftID.Time, *nusoftID.Serial)],
 			})
 		}
 

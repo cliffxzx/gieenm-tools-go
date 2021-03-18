@@ -126,16 +126,16 @@ func (f *Firewall) AddRecord(record Record) (Record, error) {
 		return Record{}, fmt.Errorf("Can't request firewall page: %s", err.Error())
 	}
 
-	url := utils.SetQuery(getAddressURL(*f.Host), map[string]string{
-		"menu":       "click_v=23\nclick_v=24\nclick_v=25\n",
-		"MULTI_LANG": "ch",
-		"se":         strconv.FormatUint(*f.recordCount+1, 10),
-	})
+	// url := utils.SetQuery(getAddressURL(*f.Host), map[string]string{
+	// 	"menu":       "click_v=23\nclick_v=24\nclick_v=25\n",
+	// 	"MULTI_LANG": "ch",
+	// 	"se":         strconv.FormatUint(*f.recordCount+1, 10),
+	// })
 
-	doc, err = f.request("GET", url, "")
-	if err != nil {
-		return Record{}, fmt.Errorf("Can't request firewall page: %s", err.Error())
-	}
+	// doc, err = f.request("GET", url, "")
+	// if err != nil {
+	// 	return Record{}, fmt.Errorf("Can't request firewall page: %s", err.Error())
+	// }
 
 	err = eachTableRow(doc, parseRecordTableRow(func(rec *Record) {
 		if *rec.Name == *record.Name {

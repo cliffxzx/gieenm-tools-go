@@ -6,6 +6,7 @@ create table if not exists record_groups (
   name varchar(36) not null,
   firewall_id int not null references firewalls on update cascade,
   nusoft_id nusoft_id_type not null,
+  subnet inet not null,
   created_at timestamp not null default current_timestamp,
   modified_at timestamp not null default current_timestamp,
   unique(nusoft_id, firewall_id)

@@ -3,26 +3,28 @@ package group
 import (
 	"errors"
 	"fmt"
-	"net"
 
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/database"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/common"
+	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/scalars"
 	"github.com/cliffxzx/gieenm-tools/pkg/utils"
 )
 
 // Adds group to database and return to parameter
 //
-// Require Name, NusoftID, FirewallID fields.
+// Require Name, Subnet, NusoftID, FirewallID fields.
 func Adds(destSource *[]Group) error {
 	type Input struct {
 		Name       string          `db:"name"`
 		NusoftID   common.NusoftID `db:"nusoft_id"`
+		Subnet     scalars.IPAddr  `db:"subnet"`
 		FirewallID int             `db:"firewall_id"`
 	}
 
 	inputs := []Input{}
 	for _, ds := range *destSource {
 		if ds.Name == nil ||
+			ds.Subnet == nil ||
 			ds.NusoftID == nil ||
 			ds.FirewallID == nil {
 			return errors.New("all array element require Name, NusoftID, FirewallID fields")
@@ -30,6 +32,7 @@ func Adds(destSource *[]Group) error {
 
 		inputs = append(inputs, Input{
 			Name:       *ds.Name,
+			Subnet:     *ds.Subnet,
 			NusoftID:   *ds.NusoftID,
 			FirewallID: *ds.FirewallID,
 		})
@@ -69,6 +72,18 @@ func Gets() (*[]Group, error) {
 	return &groups, nil
 }
 
-func GetNextIP(g Group) (*net.IPNet, error) {
+// GetByUID group ...
+func GetByUID(UID string) (*Group, error) {
+	group := Group{}
+	sql := Sqls{}.GetByUID()
+	err := database.GetDB().Get(&group, sql, UID)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return nil, errors.New("can't find group by uid")
+		}
 
+		return nil, err
+	}
+
+	return &group, nil
 }

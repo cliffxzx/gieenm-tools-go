@@ -71,12 +71,12 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		AddRecords func(childComplexity int, input []*AddRecordInput) int
-		DelRecords func(childComplexity int, input []*DelRecordInput) int
+		AddRecords func(childComplexity int, input AddRecordInput) int
+		DelRecords func(childComplexity int, input DelRecordInput) int
 		Login      func(childComplexity int, input user.LoginInput) int
 		Logout     func(childComplexity int) int
 		Register   func(childComplexity int, input user.RegisterInput) int
-		SetRecords func(childComplexity int, input []*SetRecordInput) int
+		SetRecords func(childComplexity int, input SetRecordInput) int
 	}
 
 	PageInfo struct {
@@ -117,9 +117,9 @@ type MutationResolver interface {
 	Login(ctx context.Context, input user.LoginInput) (*user.AuthPayload, error)
 	Logout(ctx context.Context) (*bool, error)
 	Register(ctx context.Context, input user.RegisterInput) (*user.AuthPayload, error)
-	AddRecords(ctx context.Context, input []*AddRecordInput) ([]*record.Record, error)
-	SetRecords(ctx context.Context, input []*SetRecordInput) ([]*record.Record, error)
-	DelRecords(ctx context.Context, input []*DelRecordInput) (*bool, error)
+	AddRecords(ctx context.Context, input AddRecordInput) (*record.Record, error)
+	SetRecords(ctx context.Context, input SetRecordInput) (*record.Record, error)
+	DelRecords(ctx context.Context, input DelRecordInput) (*record.Record, error)
 }
 type QueryResolver interface {
 	Viewer(ctx context.Context) (*viewer.Viewer, error)
@@ -227,7 +227,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.AddRecords(childComplexity, args["input"].([]*AddRecordInput)), true
+		return e.complexity.Mutation.AddRecords(childComplexity, args["input"].(AddRecordInput)), true
 
 	case "Mutation.delRecords":
 		if e.complexity.Mutation.DelRecords == nil {
@@ -239,7 +239,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.DelRecords(childComplexity, args["input"].([]*DelRecordInput)), true
+		return e.complexity.Mutation.DelRecords(childComplexity, args["input"].(DelRecordInput)), true
 
 	case "Mutation.login":
 		if e.complexity.Mutation.Login == nil {
@@ -282,7 +282,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SetRecords(childComplexity, args["input"].([]*SetRecordInput)), true
+		return e.complexity.Mutation.SetRecords(childComplexity, args["input"].(SetRecordInput)), true
 
 	case "PageInfo.endCursor":
 		if e.complexity.PageInfo.EndCursor == nil {
@@ -536,9 +536,9 @@ type Group implements Node {
   login(input: LoginInput!): AuthPayload
   logout: Boolean
   register(input: RegisterInput!): AuthPayload
-  addRecords(input: [AddRecordInput!]): [Record!]
-  setRecords(input: [SetRecordInput!]): [Record!]
-  delRecords(input: [DelRecordInput!]): Boolean
+  addRecords(input: AddRecordInput!): Record
+  setRecords(input: SetRecordInput!): Record
+  delRecords(input: DelRecordInput!): Record
 }
 
 type AuthPayload {
@@ -605,10 +605,10 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 func (ec *executionContext) field_Mutation_addRecords_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 []*AddRecordInput
+	var arg0 AddRecordInput
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalOAddRecordInput2ᚕᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐAddRecordInputᚄ(ctx, tmp)
+		arg0, err = ec.unmarshalNAddRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐAddRecordInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -620,10 +620,10 @@ func (ec *executionContext) field_Mutation_addRecords_args(ctx context.Context, 
 func (ec *executionContext) field_Mutation_delRecords_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 []*DelRecordInput
+	var arg0 DelRecordInput
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalODelRecordInput2ᚕᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐDelRecordInputᚄ(ctx, tmp)
+		arg0, err = ec.unmarshalNDelRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐDelRecordInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -665,10 +665,10 @@ func (ec *executionContext) field_Mutation_register_args(ctx context.Context, ra
 func (ec *executionContext) field_Mutation_setRecords_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 []*SetRecordInput
+	var arg0 SetRecordInput
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalOSetRecordInput2ᚕᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐSetRecordInputᚄ(ctx, tmp)
+		arg0, err = ec.unmarshalNSetRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐSetRecordInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -1223,7 +1223,7 @@ func (ec *executionContext) _Mutation_addRecords(ctx context.Context, field grap
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().AddRecords(rctx, args["input"].([]*AddRecordInput))
+		return ec.resolvers.Mutation().AddRecords(rctx, args["input"].(AddRecordInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1232,9 +1232,9 @@ func (ec *executionContext) _Mutation_addRecords(ctx context.Context, field grap
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]*record.Record)
+	res := resTmp.(*record.Record)
 	fc.Result = res
-	return ec.marshalORecord2ᚕᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋrecordᚐRecordᚄ(ctx, field.Selections, res)
+	return ec.marshalORecord2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋrecordᚐRecord(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_setRecords(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -1262,7 +1262,7 @@ func (ec *executionContext) _Mutation_setRecords(ctx context.Context, field grap
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().SetRecords(rctx, args["input"].([]*SetRecordInput))
+		return ec.resolvers.Mutation().SetRecords(rctx, args["input"].(SetRecordInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1271,9 +1271,9 @@ func (ec *executionContext) _Mutation_setRecords(ctx context.Context, field grap
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]*record.Record)
+	res := resTmp.(*record.Record)
 	fc.Result = res
-	return ec.marshalORecord2ᚕᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋrecordᚐRecordᚄ(ctx, field.Selections, res)
+	return ec.marshalORecord2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋrecordᚐRecord(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_delRecords(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -1301,7 +1301,7 @@ func (ec *executionContext) _Mutation_delRecords(ctx context.Context, field grap
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().DelRecords(rctx, args["input"].([]*DelRecordInput))
+		return ec.resolvers.Mutation().DelRecords(rctx, args["input"].(DelRecordInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1310,9 +1310,9 @@ func (ec *executionContext) _Mutation_delRecords(ctx context.Context, field grap
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*bool)
+	res := resTmp.(*record.Record)
 	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+	return ec.marshalORecord2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋrecordᚐRecord(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _PageInfo_hasNextPage(ctx context.Context, field graphql.CollectedField, obj *gql.PageInfo) (ret graphql.Marshaler) {
@@ -3874,9 +3874,9 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
-func (ec *executionContext) unmarshalNAddRecordInput2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐAddRecordInput(ctx context.Context, v interface{}) (*AddRecordInput, error) {
+func (ec *executionContext) unmarshalNAddRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐAddRecordInput(ctx context.Context, v interface{}) (AddRecordInput, error) {
 	res, err := ec.unmarshalInputAddRecordInput(ctx, v)
-	return &res, graphql.ErrorOnPath(ctx, err)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNAnnouncement2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋannouncementᚐAnnouncement(ctx context.Context, sel ast.SelectionSet, v announcement.Announcement) graphql.Marshaler {
@@ -3898,9 +3898,9 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
-func (ec *executionContext) unmarshalNDelRecordInput2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐDelRecordInput(ctx context.Context, v interface{}) (*DelRecordInput, error) {
+func (ec *executionContext) unmarshalNDelRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐDelRecordInput(ctx context.Context, v interface{}) (DelRecordInput, error) {
 	res, err := ec.unmarshalInputDelRecordInput(ctx, v)
-	return &res, graphql.ErrorOnPath(ctx, err)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNGroup2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋgroupᚐGroup(ctx context.Context, sel ast.SelectionSet, v group.Group) graphql.Marshaler {
@@ -3973,24 +3973,14 @@ func (ec *executionContext) marshalNRecord2githubᚗcomᚋcliffxzxᚋgieenmᚑto
 	return ec._Record(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNRecord2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋrecordᚐRecord(ctx context.Context, sel ast.SelectionSet, v *record.Record) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	return ec._Record(ctx, sel, v)
-}
-
 func (ec *executionContext) unmarshalNRegisterInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐRegisterInput(ctx context.Context, v interface{}) (user.RegisterInput, error) {
 	res, err := ec.unmarshalInputRegisterInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) unmarshalNSetRecordInput2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐSetRecordInput(ctx context.Context, v interface{}) (*SetRecordInput, error) {
+func (ec *executionContext) unmarshalNSetRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐSetRecordInput(ctx context.Context, v interface{}) (SetRecordInput, error) {
 	res, err := ec.unmarshalInputSetRecordInput(ctx, v)
-	return &res, graphql.ErrorOnPath(ctx, err)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v interface{}) (string, error) {
@@ -4258,30 +4248,6 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 	return res
 }
 
-func (ec *executionContext) unmarshalOAddRecordInput2ᚕᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐAddRecordInputᚄ(ctx context.Context, v interface{}) ([]*AddRecordInput, error) {
-	if v == nil {
-		return nil, nil
-	}
-	var vSlice []interface{}
-	if v != nil {
-		if tmp1, ok := v.([]interface{}); ok {
-			vSlice = tmp1
-		} else {
-			vSlice = []interface{}{v}
-		}
-	}
-	var err error
-	res := make([]*AddRecordInput, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNAddRecordInput2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐAddRecordInput(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
 func (ec *executionContext) unmarshalOAnnounceLevel2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋannouncementᚐAnnounceLevel(ctx context.Context, v interface{}) (*announcement.AnnounceLevel, error) {
 	if v == nil {
 		return nil, nil
@@ -4366,30 +4332,6 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 		return graphql.Null
 	}
 	return graphql.MarshalBoolean(*v)
-}
-
-func (ec *executionContext) unmarshalODelRecordInput2ᚕᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐDelRecordInputᚄ(ctx context.Context, v interface{}) ([]*DelRecordInput, error) {
-	if v == nil {
-		return nil, nil
-	}
-	var vSlice []interface{}
-	if v != nil {
-		if tmp1, ok := v.([]interface{}); ok {
-			vSlice = tmp1
-		} else {
-			vSlice = []interface{}{v}
-		}
-	}
-	var err error
-	res := make([]*DelRecordInput, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNDelRecordInput2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐDelRecordInput(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
 }
 
 func (ec *executionContext) marshalOGroup2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋgroupᚐGroupᚄ(ctx context.Context, sel ast.SelectionSet, v []group.Group) graphql.Marshaler {
@@ -4524,44 +4466,11 @@ func (ec *executionContext) marshalORecord2ᚕgithubᚗcomᚋcliffxzxᚋgieenm�
 	return ret
 }
 
-func (ec *executionContext) marshalORecord2ᚕᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋrecordᚐRecordᚄ(ctx context.Context, sel ast.SelectionSet, v []*record.Record) graphql.Marshaler {
+func (ec *executionContext) marshalORecord2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋrecordᚐRecord(ctx context.Context, sel ast.SelectionSet, v *record.Record) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNRecord2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋrecordᚐRecord(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-	return ret
+	return ec._Record(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalORole2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐRole(ctx context.Context, v interface{}) (*user.Role, error) {
@@ -4577,30 +4486,6 @@ func (ec *executionContext) marshalORole2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑt
 		return graphql.Null
 	}
 	return user.MarshalRole(*v)
-}
-
-func (ec *executionContext) unmarshalOSetRecordInput2ᚕᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐSetRecordInputᚄ(ctx context.Context, v interface{}) ([]*SetRecordInput, error) {
-	if v == nil {
-		return nil, nil
-	}
-	var vSlice []interface{}
-	if v != nil {
-		if tmp1, ok := v.([]interface{}); ok {
-			vSlice = tmp1
-		} else {
-			vSlice = []interface{}{v}
-		}
-	}
-	var err error
-	res := make([]*SetRecordInput, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNSetRecordInput2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐSetRecordInput(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
 }
 
 func (ec *executionContext) unmarshalOString2string(ctx context.Context, v interface{}) (string, error) {

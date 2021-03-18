@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/sync"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -46,10 +45,7 @@ func Init() {
 func Seeder() error {
 	FirewallSeeder()
 	AnnouncementSeeder()
-	err := sync.SyncNusoftToDatabase()
-	if err != nil {
-		return err
-	}
+	StudentCandySeeder()
 
 	return nil
 }

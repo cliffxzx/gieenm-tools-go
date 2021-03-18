@@ -8,6 +8,8 @@ import (
 	"fmt"
 
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/authentication"
+	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall"
+	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/group"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/record"
 	gql "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/user"
@@ -81,7 +83,7 @@ func (r *mutationResolver) Register(ctx context.Context, input user.RegisterInpu
 	return &user.AuthPayload{User: register, Token: &tokenStr}, nil
 }
 
-func (r *mutationResolver) AddRecords(ctx context.Context, input []*gql.AddRecordInput) ([]*record.Record, error) {
+func (r *mutationResolver) AddRecords(ctx context.Context, input gql.AddRecordInput) (*record.Record, error) {
 	gCtx, err := utils.GetGinContext(ctx)
 	if err != nil {
 		return nil, err
@@ -92,15 +94,37 @@ func (r *mutationResolver) AddRecords(ctx context.Context, input []*gql.AddRecor
 		return nil, err
 	}
 
-	return record.AddRecordsController(u)
+	rd := record.Record{
+		Name:    &input.Name,
+		MacAddr: input.MacAddr,
+		Group:   &group.Group{UID: &input.GroupID},
+		User:    u,
+	}
+
+	return firewall.AddRecordsController(&rd)
 }
 
-func (r *mutationResolver) SetRecords(ctx context.Context, input []*gql.SetRecordInput) ([]*record.Record, error) {
+func (r *mutationResolver) SetRecords(ctx context.Context, input gql.SetRecordInput) (*record.Record, error) {
 	panic(fmt.Errorf("not implemented"))
 }
 
-func (r *mutationResolver) DelRecords(ctx context.Context, input []*gql.DelRecordInput) (*bool, error) {
-	panic(fmt.Errorf("not implemented"))
+func (r *mutationResolver) DelRecords(ctx context.Context, input gql.DelRecordInput) (*record.Record, error) {
+	gCtx, err := utils.GetGinContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	u, err := user.GetByHeaderController(gCtx)
+	if err != nil {
+		return nil, err
+	}
+
+	rd := record.Record{
+		UID:  &input.ID,
+		User: u,
+	}
+
+	return firewall.DelRecordsController(&rd)
 }
 
 // Mutation returns gql.MutationResolver implementation.

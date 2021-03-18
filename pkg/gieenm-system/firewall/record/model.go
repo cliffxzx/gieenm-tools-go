@@ -83,6 +83,11 @@ func Adds(destSource *[]Record) error {
 
 	for idx, record := range converter {
 		(*destSource)[idx] = record.Record
+		(*destSource)[idx].ID = record.Record.ID
+		(*destSource)[idx].UID = record.Record.UID
+		(*destSource)[idx].CreatedAt = record.Record.CreatedAt
+		(*destSource)[idx].ModifiedAt = record.Record.ModifiedAt
+		(*destSource)[idx].User = &user.User{ID: record.UserID}
 		(*destSource)[idx].Group = &group.Group{ID: record.GroupID}
 		(*destSource)[idx].User = &user.User{ID: record.UserID}
 	}
@@ -162,12 +167,12 @@ func Sets(destSource *[]Record) error {
 
 // Dels record to database and return to parameter
 //
-// Require UID, Name, NusoftID, IPAddr, MacAddr, User.ID, Group.ID fields.
+// Require UID fields.
 func Dels(destSource *[]Record) error {
 	inputs := "("
 	for _, ds := range *destSource {
 		if ds.UID == nil {
-			return errors.New("all array element require UID, Name, NusoftID, IPAddr, MacAddr, User.ID, Group.ID fields")
+			return errors.New("all array element require UID fields")
 		}
 
 		inputs = fmt.Sprintf("%s%s,", inputs, *ds.UID)
@@ -200,9 +205,9 @@ func Dels(destSource *[]Record) error {
 	return nil
 }
 
-// SetRecords set record to database and return to parameter
+// GetsByUserID record to database and return to parameter
 //
-// Require Name, NusoftID, IPSetr, MacSetr, User.ID, Group.ID fields.
+// Require userID fields.
 func GetsByUserID(userID int) (*[]Record, error) {
 	records := []Record{}
 	converter := []struct {
@@ -212,6 +217,52 @@ func GetsByUserID(userID int) (*[]Record, error) {
 	}{}
 
 	err := database.GetDB().Select(&converter, Sqls{}.GetsByUserID(), userID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, r := range converter {
+		r.Record.Group = &group.Group{ID: r.GroupID}
+		r.Record.User = &user.User{ID: r.UserID}
+		records = append(records, r.Record)
+	}
+
+	return &records, nil
+}
+
+// GetsByUID record to database and return to parameter
+//
+// Require UID fields.
+func GetsByUID(UID string) (*Record, error) {
+	converter := struct {
+		Record
+		UserID  *int `db:"user_id"`
+		GroupID *int `db:"group_id"`
+	}{}
+
+	err := database.GetDB().Get(&converter, Sqls{}.GetsByUID(), UID)
+	if err != nil {
+		return nil, err
+	}
+
+	converter.Record.Group = &group.Group{ID: converter.GroupID}
+	converter.Record.User = &user.User{ID: converter.UserID}
+
+	return &converter.Record, nil
+}
+
+// GetsByGroupID record to database and return to parameter
+//
+// Require GroupID fields.
+func GetsByGroupID(groupID int) (*[]Record, error) {
+	records := []Record{}
+	converter := []struct {
+		Record
+		UserID  *int `db:"user_id"`
+		GroupID *int `db:"group_id"`
+	}{}
+
+	err := database.GetDB().Select(&converter, Sqls{}.GetsByGroupID(), groupID)
 	if err != nil {
 		return nil, err
 	}

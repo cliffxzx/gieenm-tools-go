@@ -16,8 +16,8 @@ type NusoftID nusoft.NusoftID
 func (n *NusoftID) Scan(value interface{}) error {
 	regex := regexp.MustCompile(`^\((?P<Time>.*),(?P<Serial>.*)\)$`)
 	res := regex.FindAllStringSubmatch(string(value.([]byte)), -1)
-	serial, _ := strconv.ParseInt(res[0][1], 10, 32)
-	time, _ := strconv.ParseInt(res[0][2], 10, 32)
+	serial, _ := strconv.ParseInt(res[0][2], 10, 64)
+	time, _ := strconv.ParseInt(res[0][1], 10, 64)
 	n.Serial = &serial
 	n.Time = &time
 	return nil
