@@ -47,7 +47,7 @@ func (Sqls) Dels() string {
 		from
 			records
 		where
-			id in %s
+			uid in %s
 		returning
 			id, uid, name, nusoft_id, ip_addr, mac_addr, user_id, group_id, created_at, modified_at
 `

@@ -175,11 +175,11 @@ func Dels(destSource *[]Record) error {
 			return errors.New("all array element require UID fields")
 		}
 
-		inputs = fmt.Sprintf("%s%s,", inputs, *ds.UID)
+		inputs = fmt.Sprintf("%s'%s',", inputs, *ds.UID)
 	}
 	inputs = fmt.Sprintf("%s)", inputs[:len(inputs)-1])
 
-	sql := fmt.Sprintf(Sqls{}.Sets(), inputs)
+	sql := fmt.Sprintf(Sqls{}.Dels(), inputs)
 
 	converter := []struct {
 		Record

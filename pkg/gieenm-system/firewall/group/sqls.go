@@ -13,6 +13,18 @@ func (Sqls) Gets() string {
 `
 }
 
+// GetByID ...
+func (Sqls) GetByID() string {
+	return `
+	select
+		id, uid, name, subnet, nusoft_id, firewall_id, created_at, modified_at
+	from
+		record_groups
+	where
+		id = $1
+`
+}
+
 // GetByUID ...
 func (Sqls) GetByUID() string {
 	return `

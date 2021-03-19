@@ -202,7 +202,7 @@ func TestNusoftToFirewall(t *testing.T) {
 		// 4f 管制群組
 		"20190615104456,1": "192.168.0.0/16",
 		// gieenm-tools-tokenStr
-		"20210318222159,2": "192.168.2.0/16",
+		"20210319014124,2": "192.168.2.0/16",
 	}
 
 	defaultSubnets := map[string]*scalars.IPAddr{}

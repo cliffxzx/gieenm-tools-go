@@ -72,6 +72,22 @@ func Gets() (*[]Group, error) {
 	return &groups, nil
 }
 
+// GetByID group ...
+func GetByID(ID int) (*Group, error) {
+	group := Group{}
+	sql := Sqls{}.GetByID()
+	err := database.GetDB().Get(&group, sql, ID)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			return nil, errors.New("can't find group by uid")
+		}
+
+		return nil, err
+	}
+
+	return &group, nil
+}
+
 // GetByUID group ...
 func GetByUID(UID string) (*Group, error) {
 	group := Group{}

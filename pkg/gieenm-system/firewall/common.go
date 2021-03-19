@@ -150,8 +150,8 @@ func AddRecordWithNusoft(r *record.Record) error {
 //
 // Require UID User fields.
 func DelRecordWithNusoft(r *record.Record) error {
-	if r.Name == nil || r.UID == nil {
-		return errors.New("requried Name, UID fields")
+	if r.UID == nil {
+		return errors.New("requried UID fields")
 	}
 
 	rtmp, err := record.GetsByUID(*r.UID)
@@ -161,7 +161,7 @@ func DelRecordWithNusoft(r *record.Record) error {
 
 	*r = *rtmp
 
-	g, err := group.GetByUID(*r.Group.UID)
+	g, err := group.GetByID(*r.Group.ID)
 	if err != nil {
 		return err
 	}
@@ -179,34 +179,7 @@ func DelRecordWithNusoft(r *record.Record) error {
 		return err
 	}
 
-	r.ID = (*destSource)[0].ID
-	r.CreatedAt = (*destSource)[0].CreatedAt
-	r.ModifiedAt = (*destSource)[0].ModifiedAt
-
-	infos, err := fw.Nusoft.GetRecordGroupInfos()
-	if err != nil {
-		return err
-	}
-
-	info := funk.Find(infos, func(i nusoft.RecordGroupInfo) bool {
-		return *i.ID.Time == *g.NusoftID.Time && *i.ID.Serial == *g.NusoftID.Serial
-	}).(nusoft.RecordGroupInfo)
-	nuGroup, err := fw.Nusoft.GetRecordGroup(info)
-	if err != nil {
-		return err
-	}
-
-	includes := *nuGroup.Includes
-	for i := 0; i < len(includes); i++ {
-		if *includes[i].ID.Time == *r.NusoftID.Time {
-			includes = append(includes[:i], includes[i+1:]...)
-			i--
-		}
-	}
-	err = fw.Nusoft.SetRecordGroup(info, includes)
-	if err != nil {
-		return err
-	}
+	r.Group = g
 
 	return nil
 }
