@@ -6,11 +6,11 @@ import (
 	"net"
 	"sort"
 
+	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/base/scalars"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/common"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/group"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/limit"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/record"
-	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/scalars"
 	"github.com/cliffxzx/gieenm-tools/pkg/nusoft-firewall"
 	"github.com/openlyinc/pointy"
 	"github.com/thoas/go-funk"

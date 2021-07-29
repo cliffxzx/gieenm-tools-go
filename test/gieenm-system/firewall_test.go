@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/base/scalars"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/database"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/common"
@@ -14,7 +15,6 @@ import (
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/limit"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/record"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/sync"
-	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/scalars"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/user"
 	"github.com/cliffxzx/gieenm-tools/pkg/utils"
 	"github.com/joho/godotenv"

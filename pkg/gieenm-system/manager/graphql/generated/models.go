@@ -3,7 +3,9 @@
 package gql
 
 import (
-	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/scalars"
+	"time"
+
+	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/base/scalars"
 )
 
 type AddRecordInput struct {
@@ -11,6 +13,15 @@ type AddRecordInput struct {
 	Name    string           `json:"name"`
 	MacAddr *scalars.MacAddr `json:"macAddr"`
 }
+
+type AutoSign struct {
+	ID        string     `json:"id"`
+	StartTime *time.Time `json:"startTime"`
+	EndTime   *time.Time `json:"endTime"`
+	Content   *string    `json:"content"`
+}
+
+func (AutoSign) IsNode() {}
 
 type DelRecordInput struct {
 	ID string `json:"id"`

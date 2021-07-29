@@ -11,20 +11,17 @@ import (
 
 type AutoSign struct {
 	colly    *colly.Collector
-	account  string
+	username string
 	password string
 }
 
-func (AutoSign) newColly() *colly.Collector {
-	return colly.NewCollector(
-		colly.IgnoreRobotsTxt(),
-		colly.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36"),
-	)
-}
-
-func New(account, password string) (*AutoSign, error) {
+func New(username, password string) (*AutoSign, error) {
 	autoSign := AutoSign{
-		account:  account,
+		colly: colly.NewCollector(
+			colly.IgnoreRobotsTxt(),
+			colly.UserAgent("Mozilla/5.0 (Macintosh; Intel Mac OS X 999) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/999 Safari/537.36"),
+		),
+		username: username,
 		password: password,
 	}
 
@@ -35,145 +32,138 @@ func New(account, password string) (*AutoSign, error) {
 func (a *AutoSign) Login() error {
 	csrf := ""
 
-	a.colly = a.newColly()
+	// a.colly.OnRequest(func(r *colly.Request) {
+	// 	fmt.Println(*r.Headers)
+	// })
+
+	// a.colly.OnResponse(func(r *colly.Response) {
+	// 	fmt.Println(string(r.Body))
+	// 	fmt.Println(*r.Headers)
+	// })
 
 	a.colly.OnHTML(`input[name="_csrf"]`, func(h *colly.HTMLElement) { csrf = h.Attr("value") })
-	a.colly.Visit("https://portal.ncu.edu.tw/login")
+	err := a.colly.Visit("https://portal.ncu.edu.tw/login")
+	if err != nil {
+		return err
+	}
+
 	a.colly.Wait()
 
 	if csrf == "" {
 		return errors.New("couldn't find or parsing csrf value")
 	}
 
-	a.colly.OnRequest(func(r *colly.Request) {
-		fmt.Println(*r.Headers)
-	})
-
-	a.colly.OnResponse(func(r *colly.Response) {
-		fmt.Println(string(r.Body))
-		fmt.Println(*r.Headers)
-	})
-
-	a.colly.Post("https://portal.ncu.edu.tw/login", map[string]string{
+	form := map[string]string{
 		"_csrf":    csrf,
 		"language": "CHINESE",
-		"account":  a.account,
 		"password": a.password,
-	})
+		"username": a.username,
+	}
+
+	err = a.colly.Post("https://portal.ncu.edu.tw/login", form)
+	if err != nil {
+		return err
+	}
+
 	a.colly.Wait()
 
-	a.colly.Visit("https://cis.ncu.edu.tw/HumanSys/login")
+	csrf = ""
+
+	err = a.colly.Visit("https://cis.ncu.edu.tw/HumanSys/login")
+	if err != nil {
+		return err
+	}
+
 	a.colly.Wait()
 
 	if csrf == "" {
 		return errors.New("couldn't find or parsing csrf value")
 	}
 
-	a.colly.Post("https://portal.ncu.edu.tw/leaving", map[string]string{"_csrf": csrf})
+	err = a.colly.Post("https://portal.ncu.edu.tw/leaving", map[string]string{"_csrf": csrf})
+	if err != nil {
+		return err
+	}
 
 	a.colly.Wait()
+
+	a.colly.OnHTMLDetach(`input[name="_csrf"]`)
 
 	return nil
 }
 
 // Signin ...
-// func (a *AutoSign) Signin(partTimeID string) error {
-// 	body := map[string][]string{
-// 		"functionName":      {"doSign"},
-// 		"idNo":              {""},
-// 		"ParttimeUsuallyId": {partTimeID},
-// 		"AttendWork":        {""},
-// 	}
+func (a *AutoSign) Signin(partTimeID string) error {
+	token := ""
 
-// 	req, err := http.NewRequest(
-// 		"GET",
-// 		fmt.Sprintf("https://cis.ncu.edu.tw/HumanSys/student/stdSignIn/create?ParttimeUsuallyId=%s", partTimeID),
-// 		strings.NewReader(url.Values(body).Encode()),
-// 	)
+	a.colly.OnHTML(`input[name="_token"]`, func(h *colly.HTMLElement) { token = h.Attr("value") })
+	err := a.colly.Visit(fmt.Sprintf("https://cis.ncu.edu.tw/HumanSys/student/stdSignIn/create?ParttimeUsuallyId=%s", partTimeID))
+	if err != nil {
+		return err
+	}
 
-// 	if err != nil {
-// 		return err
-// 	}
+	a.colly.Wait()
 
-// 	req.Header = *a.headers
+	if token == "" {
+		return errors.New("couldn't find or parsing token value")
+	}
 
-// 	resp, err := a.client.Do(req)
-// 	if err != nil {
-// 		return err
-// 	}
+	form := map[string]string{
+		"functionName":      "doSign",
+		"ParttimeUsuallyId": partTimeID,
+		"_token":            token,
+	}
 
-// 	doc, err := goquery.NewDocumentFromReader(resp.Body)
-// 	if err != nil {
-// 		return err
-// 	}
+	err = a.colly.Post("https://cis.ncu.edu.tw/HumanSys/student/stdSignIn_detail", form)
+	if err != nil {
+		return err
+	}
 
-// 	defer resp.Body.Close()
+	a.colly.Wait()
 
-// 	token, ok := doc.Find("input[name=\"_token\"]").Attr("value")
-// 	if !ok {
-// 		return errors.New("couldn't find or parsing token value")
-// 	}
+	a.colly.OnHTMLDetach(`input[name="_token"]`)
 
-// 	body["_token"] = []string{token}
+	return nil
+}
 
-// 	req, err = http.NewRequest(
-// 		"POST",
-// 		"https://cis.ncu.edu.tw/HumanSys/student/stdSignIn_detail",
-// 		strings.NewReader(url.Values(body).Encode()),
-// 	)
-// 	if err != nil {
-// 		return err
-// 	}
+// Signout ...
+func (a *AutoSign) Signout(partTimeID string, attendWork string) error {
+	token, idNo := "", ""
 
-// 	req.Header = *a.headers
-// 	_, err = a.client.Do(req)
-// 	if err != nil {
-// 		return err
-// 	}
+	a.colly.OnHTML(`input[name="_token"]`, func(h *colly.HTMLElement) { token = h.Attr("value") })
+	a.colly.OnHTML(`input[id="idNo"]`, func(h *colly.HTMLElement) { idNo = h.Attr("value") })
+	err := a.colly.Visit(fmt.Sprintf("https://cis.ncu.edu.tw/HumanSys/student/stdSignIn/create?ParttimeUsuallyId=%s", partTimeID))
+	if err != nil {
+		return err
+	}
 
-// 	return nil
-// }
+	a.colly.Wait()
 
-// // Signout ...
-// func Signout(headers *http.Header, cookies *cookiejar.Jar, partTimeID string, attendWork string) (*http.Header, error) {
-// 	req, _ := http.NewRequest(
-// 		"POST",
-// 		fmt.Sprintf("https://cis.ncu.edu.tw/HumanSys/student/stdSignIn/create?ParttimeUsuallyId=%s", partTimeID),
-// 		nil,
-// 	)
+	if token == "" {
+		return errors.New("couldn't find or parsing token value")
+	}
 
-// 	req.Header = *headers
-// 	client := http.Client{Jar: cookies}
-// 	resp, _ := client.Do(req)
-// 	doc, _ := goquery.NewDocumentFromReader(resp.Body)
-// 	defer resp.Body.Close()
+	if idNo == "" {
+		return errors.New("couldn't find or parsing idNo value")
+	}
 
-// 	token, ok := doc.Find("input[name=\"_token\"]").Attr("value")
-// 	if !ok {
-// 		return nil, errors.New("couldn't find or parsing token value")
-// 	}
+	form := map[string]string{
+		"functionName":      "doSign",
+		"ParttimeUsuallyId": partTimeID,
+		"AttendWork":        attendWork,
+		"idNo":              idNo,
+		"_token":            token,
+	}
 
-// 	idNo, ok := doc.Find("*[id=\"idNo\"]").Attr("value")
-// 	if !ok {
-// 		return nil, errors.New("couldn't find or parsing idNo value")
-// 	}
+	err = a.colly.Post("https://cis.ncu.edu.tw/HumanSys/student/stdSignIn_detail", form)
+	if err != nil {
+		return err
+	}
 
-// 	body := map[string][]string{
-// 		"functionName":      {"doSign"},
-// 		"idNo":              {idNo},
-// 		"ParttimeUsuallyId": {partTimeID},
-// 		"AttendWork":        {attendWork},
-// 		"_token":            {token},
-// 	}
+	a.colly.Wait()
 
-// 	req, _ = http.NewRequest(
-// 		"POST",
-// 		"https://cis.ncu.edu.tw/HumanSys/student/stdSignIn_detail",
-// 		strings.NewReader(url.Values(body).Encode()),
-// 	)
+	a.colly.OnHTMLDetach(`input[name="_token"]`)
+	a.colly.OnHTMLDetach(`input[id="idNo"]`)
 
-// 	req.Header = *headers
-// 	resp, _ = client.Do(req)
-
-// 	return &resp.Header, nil
-// }
+	return nil
+}

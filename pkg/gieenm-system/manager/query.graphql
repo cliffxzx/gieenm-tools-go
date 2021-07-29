@@ -1,0 +1,7 @@
+type Query {
+  users: [User!]!
+  records: [Record!]!
+  groups: [Group!]!
+  firewall: [Firewall!]!
+  announcement: [Announcement!]!
+}

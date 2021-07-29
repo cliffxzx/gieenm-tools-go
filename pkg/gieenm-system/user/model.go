@@ -80,6 +80,13 @@ func Get(userID int) (user User, err error) {
 	return user, err
 }
 
+// Gets ...
+func Gets() (user []User, err error) {
+	sql := Sqls{}.Gets()
+	err = database.GetDB().Select(&user, sql)
+	return user, err
+}
+
 // AddAndCheck ...
 func (u *User) AddAndCheck() (*User, error) {
 	getDb := database.GetDB()

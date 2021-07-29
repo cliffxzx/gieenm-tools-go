@@ -9,17 +9,18 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/announcement"
+	gql "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/base"
+	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/base/scalars"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/group"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/record"
-	gql "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/base"
-	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/scalars"
+	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/manager"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/user"
-	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/viewer"
 	gqlparser "github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
 )
@@ -42,6 +43,8 @@ type Config struct {
 }
 
 type ResolverRoot interface {
+	Firewall() FirewallResolver
+	Group() GroupResolver
 	Mutation() MutationResolver
 	Query() QueryResolver
 }
@@ -51,31 +54,49 @@ type DirectiveRoot struct {
 
 type ComplexityRoot struct {
 	Announcement struct {
-		Announcer func(childComplexity int) int
-		Content   func(childComplexity int) int
-		CreatedAt func(childComplexity int) int
-		Level     func(childComplexity int) int
-		Title     func(childComplexity int) int
-		UID       func(childComplexity int) int
+		Announcer  func(childComplexity int) int
+		Content    func(childComplexity int) int
+		CreatedAt  func(childComplexity int) int
+		Level      func(childComplexity int) int
+		ModifiedAt func(childComplexity int) int
+		Title      func(childComplexity int) int
+		UID        func(childComplexity int) int
 	}
 
-	AuthPayload struct {
-		Token func(childComplexity int) int
-		User  func(childComplexity int) int
+	AutoSign struct {
+		Content   func(childComplexity int) int
+		EndTime   func(childComplexity int) int
+		ID        func(childComplexity int) int
+		StartTime func(childComplexity int) int
+	}
+
+	Firewall struct {
+		CreatedAt    func(childComplexity int) int
+		Groups       func(childComplexity int) int
+		Host         func(childComplexity int) int
+		ModifiedAt   func(childComplexity int) int
+		Name         func(childComplexity int) int
+		PageRowCount func(childComplexity int) int
+		Password     func(childComplexity int) int
+		RecordCount  func(childComplexity int) int
+		UID          func(childComplexity int) int
+		Username     func(childComplexity int) int
 	}
 
 	Group struct {
-		MaxCount func(childComplexity int) int
-		Name     func(childComplexity int) int
-		UID      func(childComplexity int) int
+		CreatedAt  func(childComplexity int) int
+		Firewall   func(childComplexity int) int
+		MaxCount   func(childComplexity int) int
+		ModifiedAt func(childComplexity int) int
+		Name       func(childComplexity int) int
+		Subnet     func(childComplexity int) int
+		UID        func(childComplexity int) int
+		Users      func(childComplexity int) int
 	}
 
 	Mutation struct {
 		AddRecords func(childComplexity int, input AddRecordInput) int
 		DelRecords func(childComplexity int, input DelRecordInput) int
-		Login      func(childComplexity int, input user.LoginInput) int
-		Logout     func(childComplexity int) int
-		Register   func(childComplexity int, input user.RegisterInput) int
 		SetRecords func(childComplexity int, input SetRecordInput) int
 	}
 
@@ -87,42 +108,59 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Viewer func(childComplexity int) int
+		Announcement func(childComplexity int) int
+		Firewall     func(childComplexity int) int
+		Groups       func(childComplexity int) int
+		Records      func(childComplexity int) int
+		Users        func(childComplexity int) int
 	}
 
 	Record struct {
-		Group   func(childComplexity int) int
-		MacAddr func(childComplexity int) int
-		Name    func(childComplexity int) int
-		UID     func(childComplexity int) int
+		CreatedAt  func(childComplexity int) int
+		Group      func(childComplexity int) int
+		IPAddr     func(childComplexity int) int
+		MacAddr    func(childComplexity int) int
+		ModifiedAt func(childComplexity int) int
+		Name       func(childComplexity int) int
+		UID        func(childComplexity int) int
+		User       func(childComplexity int) int
 	}
 
 	User struct {
-		Email     func(childComplexity int) int
-		Name      func(childComplexity int) int
-		Role      func(childComplexity int) int
-		StudentID func(childComplexity int) int
-		UID       func(childComplexity int) int
-	}
-
-	Viewer struct {
-		Announcements func(childComplexity int) int
-		Groups        func(childComplexity int) int
-		Records       func(childComplexity int) int
-		User          func(childComplexity int) int
+		CreatedAt  func(childComplexity int) int
+		Email      func(childComplexity int) int
+		ModifiedAt func(childComplexity int) int
+		Name       func(childComplexity int) int
+		Password   func(childComplexity int) int
+		Role       func(childComplexity int) int
+		StudentID  func(childComplexity int) int
+		UID        func(childComplexity int) int
 	}
 }
 
+type FirewallResolver interface {
+	Host(ctx context.Context, obj *manager.Firewall) (*string, error)
+
+	RecordCount(ctx context.Context, obj *manager.Firewall) (*int, error)
+	PageRowCount(ctx context.Context, obj *manager.Firewall) (*int, error)
+	Groups(ctx context.Context, obj *manager.Firewall) ([]group.Group, error)
+}
+type GroupResolver interface {
+	Users(ctx context.Context, obj *group.Group) ([]user.User, error)
+
+	Firewall(ctx context.Context, obj *group.Group) (*manager.Firewall, error)
+}
 type MutationResolver interface {
-	Login(ctx context.Context, input user.LoginInput) (*user.AuthPayload, error)
-	Logout(ctx context.Context) (*bool, error)
-	Register(ctx context.Context, input user.RegisterInput) (*user.AuthPayload, error)
 	AddRecords(ctx context.Context, input AddRecordInput) (*record.Record, error)
 	SetRecords(ctx context.Context, input SetRecordInput) (*record.Record, error)
 	DelRecords(ctx context.Context, input DelRecordInput) (*record.Record, error)
 }
 type QueryResolver interface {
-	Viewer(ctx context.Context) (*viewer.Viewer, error)
+	Users(ctx context.Context) ([]user.User, error)
+	Records(ctx context.Context) ([]record.Record, error)
+	Groups(ctx context.Context) ([]group.Group, error)
+	Firewall(ctx context.Context) ([]manager.Firewall, error)
+	Announcement(ctx context.Context) ([]announcement.Announcement, error)
 }
 
 type executableSchema struct {
@@ -168,6 +206,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Announcement.Level(childComplexity), true
 
+	case "Announcement.modifiedAt":
+		if e.complexity.Announcement.ModifiedAt == nil {
+			break
+		}
+
+		return e.complexity.Announcement.ModifiedAt(childComplexity), true
+
 	case "Announcement.title":
 		if e.complexity.Announcement.Title == nil {
 			break
@@ -182,19 +227,117 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Announcement.UID(childComplexity), true
 
-	case "AuthPayload.token":
-		if e.complexity.AuthPayload.Token == nil {
+	case "AutoSign.content":
+		if e.complexity.AutoSign.Content == nil {
 			break
 		}
 
-		return e.complexity.AuthPayload.Token(childComplexity), true
+		return e.complexity.AutoSign.Content(childComplexity), true
 
-	case "AuthPayload.user":
-		if e.complexity.AuthPayload.User == nil {
+	case "AutoSign.endTime":
+		if e.complexity.AutoSign.EndTime == nil {
 			break
 		}
 
-		return e.complexity.AuthPayload.User(childComplexity), true
+		return e.complexity.AutoSign.EndTime(childComplexity), true
+
+	case "AutoSign.id":
+		if e.complexity.AutoSign.ID == nil {
+			break
+		}
+
+		return e.complexity.AutoSign.ID(childComplexity), true
+
+	case "AutoSign.startTime":
+		if e.complexity.AutoSign.StartTime == nil {
+			break
+		}
+
+		return e.complexity.AutoSign.StartTime(childComplexity), true
+
+	case "Firewall.createdAt":
+		if e.complexity.Firewall.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.Firewall.CreatedAt(childComplexity), true
+
+	case "Firewall.groups":
+		if e.complexity.Firewall.Groups == nil {
+			break
+		}
+
+		return e.complexity.Firewall.Groups(childComplexity), true
+
+	case "Firewall.host":
+		if e.complexity.Firewall.Host == nil {
+			break
+		}
+
+		return e.complexity.Firewall.Host(childComplexity), true
+
+	case "Firewall.modifiedAt":
+		if e.complexity.Firewall.ModifiedAt == nil {
+			break
+		}
+
+		return e.complexity.Firewall.ModifiedAt(childComplexity), true
+
+	case "Firewall.name":
+		if e.complexity.Firewall.Name == nil {
+			break
+		}
+
+		return e.complexity.Firewall.Name(childComplexity), true
+
+	case "Firewall.pageRowCount":
+		if e.complexity.Firewall.PageRowCount == nil {
+			break
+		}
+
+		return e.complexity.Firewall.PageRowCount(childComplexity), true
+
+	case "Firewall.password":
+		if e.complexity.Firewall.Password == nil {
+			break
+		}
+
+		return e.complexity.Firewall.Password(childComplexity), true
+
+	case "Firewall.recordCount":
+		if e.complexity.Firewall.RecordCount == nil {
+			break
+		}
+
+		return e.complexity.Firewall.RecordCount(childComplexity), true
+
+	case "Firewall.id":
+		if e.complexity.Firewall.UID == nil {
+			break
+		}
+
+		return e.complexity.Firewall.UID(childComplexity), true
+
+	case "Firewall.username":
+		if e.complexity.Firewall.Username == nil {
+			break
+		}
+
+		return e.complexity.Firewall.Username(childComplexity), true
+
+	case "Group.createdAt":
+		if e.complexity.Group.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.Group.CreatedAt(childComplexity), true
+
+	case "Group.firewall":
+		if e.complexity.Group.Firewall == nil {
+			break
+		}
+
+		return e.complexity.Group.Firewall(childComplexity), true
 
 	case "Group.maxCount":
 		if e.complexity.Group.MaxCount == nil {
@@ -203,6 +346,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Group.MaxCount(childComplexity), true
 
+	case "Group.modifiedAt":
+		if e.complexity.Group.ModifiedAt == nil {
+			break
+		}
+
+		return e.complexity.Group.ModifiedAt(childComplexity), true
+
 	case "Group.name":
 		if e.complexity.Group.Name == nil {
 			break
@@ -210,12 +360,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Group.Name(childComplexity), true
 
+	case "Group.subnet":
+		if e.complexity.Group.Subnet == nil {
+			break
+		}
+
+		return e.complexity.Group.Subnet(childComplexity), true
+
 	case "Group.id":
 		if e.complexity.Group.UID == nil {
 			break
 		}
 
 		return e.complexity.Group.UID(childComplexity), true
+
+	case "Group.users":
+		if e.complexity.Group.Users == nil {
+			break
+		}
+
+		return e.complexity.Group.Users(childComplexity), true
 
 	case "Mutation.addRecords":
 		if e.complexity.Mutation.AddRecords == nil {
@@ -240,37 +404,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Mutation.DelRecords(childComplexity, args["input"].(DelRecordInput)), true
-
-	case "Mutation.login":
-		if e.complexity.Mutation.Login == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_login_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.Login(childComplexity, args["input"].(user.LoginInput)), true
-
-	case "Mutation.logout":
-		if e.complexity.Mutation.Logout == nil {
-			break
-		}
-
-		return e.complexity.Mutation.Logout(childComplexity), true
-
-	case "Mutation.register":
-		if e.complexity.Mutation.Register == nil {
-			break
-		}
-
-		args, err := ec.field_Mutation_register_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Mutation.Register(childComplexity, args["input"].(user.RegisterInput)), true
 
 	case "Mutation.setRecords":
 		if e.complexity.Mutation.SetRecords == nil {
@@ -312,12 +445,47 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.PageInfo.StartCursor(childComplexity), true
 
-	case "Query.viewer":
-		if e.complexity.Query.Viewer == nil {
+	case "Query.announcement":
+		if e.complexity.Query.Announcement == nil {
 			break
 		}
 
-		return e.complexity.Query.Viewer(childComplexity), true
+		return e.complexity.Query.Announcement(childComplexity), true
+
+	case "Query.firewall":
+		if e.complexity.Query.Firewall == nil {
+			break
+		}
+
+		return e.complexity.Query.Firewall(childComplexity), true
+
+	case "Query.groups":
+		if e.complexity.Query.Groups == nil {
+			break
+		}
+
+		return e.complexity.Query.Groups(childComplexity), true
+
+	case "Query.records":
+		if e.complexity.Query.Records == nil {
+			break
+		}
+
+		return e.complexity.Query.Records(childComplexity), true
+
+	case "Query.users":
+		if e.complexity.Query.Users == nil {
+			break
+		}
+
+		return e.complexity.Query.Users(childComplexity), true
+
+	case "Record.createdAt":
+		if e.complexity.Record.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.Record.CreatedAt(childComplexity), true
 
 	case "Record.group":
 		if e.complexity.Record.Group == nil {
@@ -326,12 +494,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Record.Group(childComplexity), true
 
+	case "Record.ipAddr":
+		if e.complexity.Record.IPAddr == nil {
+			break
+		}
+
+		return e.complexity.Record.IPAddr(childComplexity), true
+
 	case "Record.macAddr":
 		if e.complexity.Record.MacAddr == nil {
 			break
 		}
 
 		return e.complexity.Record.MacAddr(childComplexity), true
+
+	case "Record.modifiedAt":
+		if e.complexity.Record.ModifiedAt == nil {
+			break
+		}
+
+		return e.complexity.Record.ModifiedAt(childComplexity), true
 
 	case "Record.name":
 		if e.complexity.Record.Name == nil {
@@ -347,6 +529,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Record.UID(childComplexity), true
 
+	case "Record.user":
+		if e.complexity.Record.User == nil {
+			break
+		}
+
+		return e.complexity.Record.User(childComplexity), true
+
+	case "User.createdAt":
+		if e.complexity.User.CreatedAt == nil {
+			break
+		}
+
+		return e.complexity.User.CreatedAt(childComplexity), true
+
 	case "User.email":
 		if e.complexity.User.Email == nil {
 			break
@@ -354,12 +550,26 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.User.Email(childComplexity), true
 
+	case "User.modifiedAt":
+		if e.complexity.User.ModifiedAt == nil {
+			break
+		}
+
+		return e.complexity.User.ModifiedAt(childComplexity), true
+
 	case "User.name":
 		if e.complexity.User.Name == nil {
 			break
 		}
 
 		return e.complexity.User.Name(childComplexity), true
+
+	case "User.password":
+		if e.complexity.User.Password == nil {
+			break
+		}
+
+		return e.complexity.User.Password(childComplexity), true
 
 	case "User.role":
 		if e.complexity.User.Role == nil {
@@ -381,34 +591,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.User.UID(childComplexity), true
-
-	case "Viewer.announcements":
-		if e.complexity.Viewer.Announcements == nil {
-			break
-		}
-
-		return e.complexity.Viewer.Announcements(childComplexity), true
-
-	case "Viewer.groups":
-		if e.complexity.Viewer.Groups == nil {
-			break
-		}
-
-		return e.complexity.Viewer.Groups(childComplexity), true
-
-	case "Viewer.records":
-		if e.complexity.Viewer.Records == nil {
-			break
-		}
-
-		return e.complexity.Viewer.Records(childComplexity), true
-
-	case "Viewer.user":
-		if e.complexity.Viewer.User == nil {
-			break
-		}
-
-		return e.complexity.Viewer.User(childComplexity), true
 
 	}
 	return 0, false
@@ -474,16 +656,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 }
 
 var sources = []*ast.Source{
-	{Name: "pkg/gieenm-system/graphql/schemas/announcement.graphql", Input: `type Announcement implements Node {
-  id: ID!
-  title: String
-  content: String
-  announcer: String
-  createdAt: Time
-  level: AnnounceLevel
-}
-`, BuiltIn: false},
-	{Name: "pkg/gieenm-system/graphql/schemas/base.graphql", Input: `directive @goModel(
+	{Name: "pkg/gieenm-system/base/base.graphql", Input: `directive @goModel(
   model: String
   models: [String!]
 ) on OBJECT | INPUT_OBJECT | SCALAR | ENUM | INTERFACE | UNION
@@ -519,44 +692,73 @@ scalar IPAddr
 scalar MacAddr
 scalar AnnounceLevel
 `, BuiltIn: false},
-	{Name: "pkg/gieenm-system/graphql/schemas/firewall.graphql", Input: `type Record implements Node {
+	{Name: "pkg/gieenm-system/manager/manager.graphql", Input: `type AutoSign implements Node {
+  id: ID!
+  startTime: Time
+  endTime: Time
+  content: String
+}
+
+type Record implements Node {
   id: ID!
   name: String
+  user: User
   group: Group
+  ipAddr: IPAddr
   macAddr: MacAddr
+  createdAt: Time!
+  modifiedAt: Time
 }
 
 type Group implements Node {
   id: ID!
+  users: [User!]
   name: String
+  subnet: IPAddr
   maxCount: Int
+  firewall: Firewall
+  createdAt: Time!
+  modifiedAt: Time
+}
+
+type Firewall implements Node {
+  id: ID!
+  name: String
+  host: String
+  username: String
+  password: String
+  recordCount: Int
+  pageRowCount: Int
+  groups: [Group!]
+  createdAt: Time!
+  modifiedAt: Time
+}
+
+type User implements Node {
+  id: ID!
+  name: String
+  email: String
+  studentID: String
+  role: Role
+  password: String
+  createdAt: Time!
+  modifiedAt: Time
+}
+
+type Announcement implements Node {
+  id: ID!
+  title: String
+  content: String
+  announcer: String
+  createdAt: Time!
+  modifiedAt: Time
+  level: AnnounceLevel
 }
 `, BuiltIn: false},
-	{Name: "pkg/gieenm-system/graphql/schemas/mutation.graphql", Input: `type Mutation {
-  login(input: LoginInput!): AuthPayload
-  logout: Boolean
-  register(input: RegisterInput!): AuthPayload
+	{Name: "pkg/gieenm-system/manager/mutation.graphql", Input: `type Mutation {
   addRecords(input: AddRecordInput!): Record
   setRecords(input: SetRecordInput!): Record
   delRecords(input: DelRecordInput!): Record
-}
-
-type AuthPayload {
-  token: String
-  user: User
-}
-
-input LoginInput {
-  email: String
-  studentID: String
-  password: String!
-}
-
-input RegisterInput {
-  name: String!
-  email: String!
-  studentID: String
-  password: String!
 }
 
 input AddRecordInput {
@@ -576,23 +778,12 @@ input DelRecordInput {
   id: ID!
 }
 `, BuiltIn: false},
-	{Name: "pkg/gieenm-system/graphql/schemas/query.graphql", Input: `type Query {
-  viewer: Viewer
-}
-`, BuiltIn: false},
-	{Name: "pkg/gieenm-system/graphql/schemas/user.graphql", Input: `type User implements Node {
-  id: ID!
-  name: String
-  email: String
-  studentID: String
-  role: Role
-}
-`, BuiltIn: false},
-	{Name: "pkg/gieenm-system/graphql/schemas/viewer.graphql", Input: `type Viewer {
-  user: User
-  records: [Record!]
-  groups: [Group!]
-  announcements: [Announcement!]
+	{Name: "pkg/gieenm-system/manager/query.graphql", Input: `type Query {
+  users: [User!]!
+  records: [Record!]!
+  groups: [Group!]!
+  firewall: [Firewall!]!
+  announcement: [Announcement!]!
 }
 `, BuiltIn: false},
 }
@@ -608,7 +799,7 @@ func (ec *executionContext) field_Mutation_addRecords_args(ctx context.Context, 
 	var arg0 AddRecordInput
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNAddRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐAddRecordInput(ctx, tmp)
+		arg0, err = ec.unmarshalNAddRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋmanagerᚋgraphqlᚋgeneratedᚐAddRecordInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -623,37 +814,7 @@ func (ec *executionContext) field_Mutation_delRecords_args(ctx context.Context, 
 	var arg0 DelRecordInput
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNDelRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐDelRecordInput(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["input"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_login_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 user.LoginInput
-	if tmp, ok := rawArgs["input"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNLoginInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐLoginInput(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["input"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Mutation_register_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 user.RegisterInput
-	if tmp, ok := rawArgs["input"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNRegisterInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐRegisterInput(ctx, tmp)
+		arg0, err = ec.unmarshalNDelRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋmanagerᚋgraphqlᚋgeneratedᚐDelRecordInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -668,7 +829,7 @@ func (ec *executionContext) field_Mutation_setRecords_args(ctx context.Context, 
 	var arg0 SetRecordInput
 	if tmp, ok := rawArgs["input"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNSetRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐSetRecordInput(ctx, tmp)
+		arg0, err = ec.unmarshalNSetRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋmanagerᚋgraphqlᚋgeneratedᚐSetRecordInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -886,6 +1047,41 @@ func (ec *executionContext) _Announcement_createdAt(ctx context.Context, field g
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalNTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Announcement_modifiedAt(ctx context.Context, field graphql.CollectedField, obj *announcement.Announcement) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Announcement",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ModifiedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
 		return graphql.Null
 	}
 	res := resTmp.(*time.Time)
@@ -925,7 +1121,7 @@ func (ec *executionContext) _Announcement_level(ctx context.Context, field graph
 	return ec.marshalOAnnounceLevel2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋannouncementᚐAnnounceLevel(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _AuthPayload_token(ctx context.Context, field graphql.CollectedField, obj *user.AuthPayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _AutoSign_id(ctx context.Context, field graphql.CollectedField, obj *AutoSign) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -933,7 +1129,7 @@ func (ec *executionContext) _AuthPayload_token(ctx context.Context, field graphq
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "AuthPayload",
+		Object:     "AutoSign",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -943,7 +1139,106 @@ func (ec *executionContext) _AuthPayload_token(ctx context.Context, field graphq
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Token, nil
+		return obj.ID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNID2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _AutoSign_startTime(ctx context.Context, field graphql.CollectedField, obj *AutoSign) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "AutoSign",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.StartTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _AutoSign_endTime(ctx context.Context, field graphql.CollectedField, obj *AutoSign) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "AutoSign",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EndTime, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _AutoSign_content(ctx context.Context, field graphql.CollectedField, obj *AutoSign) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "AutoSign",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Content, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -957,7 +1252,7 @@ func (ec *executionContext) _AuthPayload_token(ctx context.Context, field graphq
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _AuthPayload_user(ctx context.Context, field graphql.CollectedField, obj *user.AuthPayload) (ret graphql.Marshaler) {
+func (ec *executionContext) _Firewall_id(ctx context.Context, field graphql.CollectedField, obj *manager.Firewall) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -965,7 +1260,7 @@ func (ec *executionContext) _AuthPayload_user(ctx context.Context, field graphql
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "AuthPayload",
+		Object:     "Firewall",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -975,7 +1270,42 @@ func (ec *executionContext) _AuthPayload_user(ctx context.Context, field graphql
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.User, nil
+		return obj.UID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalNID2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Firewall_name(ctx context.Context, field graphql.CollectedField, obj *manager.Firewall) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Firewall",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Name, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -984,9 +1314,268 @@ func (ec *executionContext) _AuthPayload_user(ctx context.Context, field graphql
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*user.User)
+	res := resTmp.(*string)
 	fc.Result = res
-	return ec.marshalOUser2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐUser(ctx, field.Selections, res)
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Firewall_host(ctx context.Context, field graphql.CollectedField, obj *manager.Firewall) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Firewall",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Firewall().Host(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Firewall_username(ctx context.Context, field graphql.CollectedField, obj *manager.Firewall) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Firewall",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Username, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Firewall_password(ctx context.Context, field graphql.CollectedField, obj *manager.Firewall) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Firewall",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Password, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Firewall_recordCount(ctx context.Context, field graphql.CollectedField, obj *manager.Firewall) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Firewall",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Firewall().RecordCount(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Firewall_pageRowCount(ctx context.Context, field graphql.CollectedField, obj *manager.Firewall) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Firewall",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Firewall().PageRowCount(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*int)
+	fc.Result = res
+	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Firewall_groups(ctx context.Context, field graphql.CollectedField, obj *manager.Firewall) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Firewall",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Firewall().Groups(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]group.Group)
+	fc.Result = res
+	return ec.marshalOGroup2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋgroupᚐGroupᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Firewall_createdAt(ctx context.Context, field graphql.CollectedField, obj *manager.Firewall) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Firewall",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalNTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Firewall_modifiedAt(ctx context.Context, field graphql.CollectedField, obj *manager.Firewall) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Firewall",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ModifiedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Group_id(ctx context.Context, field graphql.CollectedField, obj *group.Group) (ret graphql.Marshaler) {
@@ -1024,6 +1613,38 @@ func (ec *executionContext) _Group_id(ctx context.Context, field graphql.Collect
 	return ec.marshalNID2ᚖstring(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Group_users(ctx context.Context, field graphql.CollectedField, obj *group.Group) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Group",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Group().Users(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.([]user.User)
+	fc.Result = res
+	return ec.marshalOUser2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐUserᚄ(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Group_name(ctx context.Context, field graphql.CollectedField, obj *group.Group) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -1054,6 +1675,38 @@ func (ec *executionContext) _Group_name(ctx context.Context, field graphql.Colle
 	res := resTmp.(*string)
 	fc.Result = res
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Group_subnet(ctx context.Context, field graphql.CollectedField, obj *group.Group) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Group",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Subnet, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*scalars.IPAddr)
+	fc.Result = res
+	return ec.marshalOIPAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋbaseᚋscalarsᚐIPAddr(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Group_maxCount(ctx context.Context, field graphql.CollectedField, obj *group.Group) (ret graphql.Marshaler) {
@@ -1088,7 +1741,7 @@ func (ec *executionContext) _Group_maxCount(ctx context.Context, field graphql.C
 	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_login(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Group_firewall(ctx context.Context, field graphql.CollectedField, obj *group.Group) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1096,7 +1749,7 @@ func (ec *executionContext) _Mutation_login(ctx context.Context, field graphql.C
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "Mutation",
+		Object:     "Group",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   true,
@@ -1104,16 +1757,9 @@ func (ec *executionContext) _Mutation_login(ctx context.Context, field graphql.C
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_login_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().Login(rctx, args["input"].(user.LoginInput))
+		return ec.resolvers.Group().Firewall(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1122,12 +1768,12 @@ func (ec *executionContext) _Mutation_login(ctx context.Context, field graphql.C
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*user.AuthPayload)
+	res := resTmp.(*manager.Firewall)
 	fc.Result = res
-	return ec.marshalOAuthPayload2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐAuthPayload(ctx, field.Selections, res)
+	return ec.marshalOFirewall2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋmanagerᚐFirewall(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_logout(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Group_createdAt(ctx context.Context, field graphql.CollectedField, obj *group.Group) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1135,31 +1781,34 @@ func (ec *executionContext) _Mutation_logout(ctx context.Context, field graphql.
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "Mutation",
+		Object:     "Group",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().Logout(rctx)
+		return obj.CreatedAt, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*bool)
+	res := resTmp.(*time.Time)
 	fc.Result = res
-	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+	return ec.marshalNTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Mutation_register(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Group_modifiedAt(ctx context.Context, field graphql.CollectedField, obj *group.Group) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1167,24 +1816,17 @@ func (ec *executionContext) _Mutation_register(ctx context.Context, field graphq
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "Mutation",
+		Object:     "Group",
 		Field:      field,
 		Args:       nil,
-		IsMethod:   true,
-		IsResolver: true,
+		IsMethod:   false,
+		IsResolver: false,
 	}
 
 	ctx = graphql.WithFieldContext(ctx, fc)
-	rawArgs := field.ArgumentMap(ec.Variables)
-	args, err := ec.field_Mutation_register_args(ctx, rawArgs)
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().Register(rctx, args["input"].(user.RegisterInput))
+		return obj.ModifiedAt, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1193,9 +1835,9 @@ func (ec *executionContext) _Mutation_register(ctx context.Context, field graphq
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*user.AuthPayload)
+	res := resTmp.(*time.Time)
 	fc.Result = res
-	return ec.marshalOAuthPayload2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐAuthPayload(ctx, field.Selections, res)
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Mutation_addRecords(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -1449,7 +2091,7 @@ func (ec *executionContext) _PageInfo_endCursor(ctx context.Context, field graph
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Query_viewer(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+func (ec *executionContext) _Query_users(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1467,18 +2109,161 @@ func (ec *executionContext) _Query_viewer(ctx context.Context, field graphql.Col
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Viewer(rctx)
+		return ec.resolvers.Query().Users(rctx)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*viewer.Viewer)
+	res := resTmp.([]user.User)
 	fc.Result = res
-	return ec.marshalOViewer2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋviewerᚐViewer(ctx, field.Selections, res)
+	return ec.marshalNUser2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐUserᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_records(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().Records(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]record.Record)
+	fc.Result = res
+	return ec.marshalNRecord2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋrecordᚐRecordᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_groups(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().Groups(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]group.Group)
+	fc.Result = res
+	return ec.marshalNGroup2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋgroupᚐGroupᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_firewall(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().Firewall(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]manager.Firewall)
+	fc.Result = res
+	return ec.marshalNFirewall2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋmanagerᚐFirewallᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_announcement(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   true,
+		IsResolver: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().Announcement(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]announcement.Announcement)
+	fc.Result = res
+	return ec.marshalNAnnouncement2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋannouncementᚐAnnouncementᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -1619,6 +2404,38 @@ func (ec *executionContext) _Record_name(ctx context.Context, field graphql.Coll
 	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Record_user(ctx context.Context, field graphql.CollectedField, obj *record.Record) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Record",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.User, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*user.User)
+	fc.Result = res
+	return ec.marshalOUser2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐUser(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Record_group(ctx context.Context, field graphql.CollectedField, obj *record.Record) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -1651,6 +2468,38 @@ func (ec *executionContext) _Record_group(ctx context.Context, field graphql.Col
 	return ec.marshalOGroup2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋgroupᚐGroup(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Record_ipAddr(ctx context.Context, field graphql.CollectedField, obj *record.Record) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Record",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IPAddr, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*scalars.IPAddr)
+	fc.Result = res
+	return ec.marshalOIPAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋbaseᚋscalarsᚐIPAddr(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Record_macAddr(ctx context.Context, field graphql.CollectedField, obj *record.Record) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -1680,7 +2529,74 @@ func (ec *executionContext) _Record_macAddr(ctx context.Context, field graphql.C
 	}
 	res := resTmp.(*scalars.MacAddr)
 	fc.Result = res
-	return ec.marshalOMacAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚋscalarsᚐMacAddr(ctx, field.Selections, res)
+	return ec.marshalOMacAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋbaseᚋscalarsᚐMacAddr(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Record_createdAt(ctx context.Context, field graphql.CollectedField, obj *record.Record) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Record",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CreatedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalNTime2ᚖtimeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Record_modifiedAt(ctx context.Context, field graphql.CollectedField, obj *record.Record) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:     "Record",
+		Field:      field,
+		Args:       nil,
+		IsMethod:   false,
+		IsResolver: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ModifiedAt, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*time.Time)
+	fc.Result = res
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _User_id(ctx context.Context, field graphql.CollectedField, obj *user.User) (ret graphql.Marshaler) {
@@ -1846,7 +2762,7 @@ func (ec *executionContext) _User_role(ctx context.Context, field graphql.Collec
 	return ec.marshalORole2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐRole(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Viewer_user(ctx context.Context, field graphql.CollectedField, obj *viewer.Viewer) (ret graphql.Marshaler) {
+func (ec *executionContext) _User_password(ctx context.Context, field graphql.CollectedField, obj *user.User) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1854,7 +2770,7 @@ func (ec *executionContext) _Viewer_user(ctx context.Context, field graphql.Coll
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "Viewer",
+		Object:     "User",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -1864,7 +2780,7 @@ func (ec *executionContext) _Viewer_user(ctx context.Context, field graphql.Coll
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.User, nil
+		return obj.Password, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1873,12 +2789,12 @@ func (ec *executionContext) _Viewer_user(ctx context.Context, field graphql.Coll
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*user.User)
+	res := resTmp.(*string)
 	fc.Result = res
-	return ec.marshalOUser2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐUser(ctx, field.Selections, res)
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Viewer_records(ctx context.Context, field graphql.CollectedField, obj *viewer.Viewer) (ret graphql.Marshaler) {
+func (ec *executionContext) _User_createdAt(ctx context.Context, field graphql.CollectedField, obj *user.User) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1886,7 +2802,7 @@ func (ec *executionContext) _Viewer_records(ctx context.Context, field graphql.C
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "Viewer",
+		Object:     "User",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -1896,21 +2812,24 @@ func (ec *executionContext) _Viewer_records(ctx context.Context, field graphql.C
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Records, nil
+		return obj.CreatedAt, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.([]record.Record)
+	res := resTmp.(*time.Time)
 	fc.Result = res
-	return ec.marshalORecord2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋrecordᚐRecordᚄ(ctx, field.Selections, res)
+	return ec.marshalNTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Viewer_groups(ctx context.Context, field graphql.CollectedField, obj *viewer.Viewer) (ret graphql.Marshaler) {
+func (ec *executionContext) _User_modifiedAt(ctx context.Context, field graphql.CollectedField, obj *user.User) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -1918,7 +2837,7 @@ func (ec *executionContext) _Viewer_groups(ctx context.Context, field graphql.Co
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:     "Viewer",
+		Object:     "User",
 		Field:      field,
 		Args:       nil,
 		IsMethod:   false,
@@ -1928,7 +2847,7 @@ func (ec *executionContext) _Viewer_groups(ctx context.Context, field graphql.Co
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Groups, nil
+		return obj.ModifiedAt, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1937,41 +2856,9 @@ func (ec *executionContext) _Viewer_groups(ctx context.Context, field graphql.Co
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]group.Group)
+	res := resTmp.(*time.Time)
 	fc.Result = res
-	return ec.marshalOGroup2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋgroupᚐGroupᚄ(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Viewer_announcements(ctx context.Context, field graphql.CollectedField, obj *viewer.Viewer) (ret graphql.Marshaler) {
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc := &graphql.FieldContext{
-		Object:     "Viewer",
-		Field:      field,
-		Args:       nil,
-		IsMethod:   false,
-		IsResolver: false,
-	}
-
-	ctx = graphql.WithFieldContext(ctx, fc)
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Announcements, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.([]announcement.Announcement)
-	fc.Result = res
-	return ec.marshalOAnnouncement2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋannouncementᚐAnnouncementᚄ(ctx, field.Selections, res)
+	return ec.marshalOTime2ᚖtimeᚐTime(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) ___Directive_name(ctx context.Context, field graphql.CollectedField, obj *introspection.Directive) (ret graphql.Marshaler) {
@@ -3087,7 +3974,7 @@ func (ec *executionContext) unmarshalInputAddRecordInput(ctx context.Context, ob
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("macAddr"))
-			it.MacAddr, err = ec.unmarshalNMacAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚋscalarsᚐMacAddr(ctx, v)
+			it.MacAddr, err = ec.unmarshalNMacAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋbaseᚋscalarsᚐMacAddr(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -3108,42 +3995,6 @@ func (ec *executionContext) unmarshalInputDelRecordInput(ctx context.Context, ob
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
 			it.ID, err = ec.unmarshalNID2string(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		}
-	}
-
-	return it, nil
-}
-
-func (ec *executionContext) unmarshalInputLoginInput(ctx context.Context, obj interface{}) (user.LoginInput, error) {
-	var it user.LoginInput
-	var asMap = obj.(map[string]interface{})
-
-	for k, v := range asMap {
-		switch k {
-		case "email":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
-			it.Email, err = ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "studentID":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("studentID"))
-			it.StudentID, err = ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "password":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
-			it.Password, err = ec.unmarshalNString2ᚖstring(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -3189,50 +4040,6 @@ func (ec *executionContext) unmarshalInputPageInput(ctx context.Context, obj int
 	return it, nil
 }
 
-func (ec *executionContext) unmarshalInputRegisterInput(ctx context.Context, obj interface{}) (user.RegisterInput, error) {
-	var it user.RegisterInput
-	var asMap = obj.(map[string]interface{})
-
-	for k, v := range asMap {
-		switch k {
-		case "name":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
-			it.Name, err = ec.unmarshalNString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "email":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
-			it.Email, err = ec.unmarshalNString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "studentID":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("studentID"))
-			it.StudentID, err = ec.unmarshalOString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		case "password":
-			var err error
-
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
-			it.Password, err = ec.unmarshalNString2ᚖstring(ctx, v)
-			if err != nil {
-				return it, err
-			}
-		}
-	}
-
-	return it, nil
-}
-
 func (ec *executionContext) unmarshalInputSetRecordInput(ctx context.Context, obj interface{}) (SetRecordInput, error) {
 	var it SetRecordInput
 	var asMap = obj.(map[string]interface{})
@@ -3267,7 +4074,7 @@ func (ec *executionContext) unmarshalInputSetRecordInput(ctx context.Context, ob
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("macAddr"))
-			it.MacAddr, err = ec.unmarshalOMacAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚋscalarsᚐMacAddr(ctx, v)
+			it.MacAddr, err = ec.unmarshalOMacAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋbaseᚋscalarsᚐMacAddr(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -3285,13 +4092,13 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 	switch obj := (obj).(type) {
 	case nil:
 		return graphql.Null
-	case announcement.Announcement:
-		return ec._Announcement(ctx, sel, &obj)
-	case *announcement.Announcement:
+	case AutoSign:
+		return ec._AutoSign(ctx, sel, &obj)
+	case *AutoSign:
 		if obj == nil {
 			return graphql.Null
 		}
-		return ec._Announcement(ctx, sel, obj)
+		return ec._AutoSign(ctx, sel, obj)
 	case record.Record:
 		return ec._Record(ctx, sel, &obj)
 	case *record.Record:
@@ -3306,6 +4113,13 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._Group(ctx, sel, obj)
+	case manager.Firewall:
+		return ec._Firewall(ctx, sel, &obj)
+	case *manager.Firewall:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._Firewall(ctx, sel, obj)
 	case user.User:
 		return ec._User(ctx, sel, &obj)
 	case *user.User:
@@ -3313,6 +4127,13 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 			return graphql.Null
 		}
 		return ec._User(ctx, sel, obj)
+	case announcement.Announcement:
+		return ec._Announcement(ctx, sel, &obj)
+	case *announcement.Announcement:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._Announcement(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -3346,6 +4167,11 @@ func (ec *executionContext) _Announcement(ctx context.Context, sel ast.Selection
 			out.Values[i] = ec._Announcement_announcer(ctx, field, obj)
 		case "createdAt":
 			out.Values[i] = ec._Announcement_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "modifiedAt":
+			out.Values[i] = ec._Announcement_modifiedAt(ctx, field, obj)
 		case "level":
 			out.Values[i] = ec._Announcement_level(ctx, field, obj)
 		default:
@@ -3359,21 +4185,112 @@ func (ec *executionContext) _Announcement(ctx context.Context, sel ast.Selection
 	return out
 }
 
-var authPayloadImplementors = []string{"AuthPayload"}
+var autoSignImplementors = []string{"AutoSign", "Node"}
 
-func (ec *executionContext) _AuthPayload(ctx context.Context, sel ast.SelectionSet, obj *user.AuthPayload) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, authPayloadImplementors)
+func (ec *executionContext) _AutoSign(ctx context.Context, sel ast.SelectionSet, obj *AutoSign) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, autoSignImplementors)
 
 	out := graphql.NewFieldSet(fields)
 	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("AuthPayload")
-		case "token":
-			out.Values[i] = ec._AuthPayload_token(ctx, field, obj)
-		case "user":
-			out.Values[i] = ec._AuthPayload_user(ctx, field, obj)
+			out.Values[i] = graphql.MarshalString("AutoSign")
+		case "id":
+			out.Values[i] = ec._AutoSign_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "startTime":
+			out.Values[i] = ec._AutoSign_startTime(ctx, field, obj)
+		case "endTime":
+			out.Values[i] = ec._AutoSign_endTime(ctx, field, obj)
+		case "content":
+			out.Values[i] = ec._AutoSign_content(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var firewallImplementors = []string{"Firewall", "Node"}
+
+func (ec *executionContext) _Firewall(ctx context.Context, sel ast.SelectionSet, obj *manager.Firewall) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, firewallImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Firewall")
+		case "id":
+			out.Values[i] = ec._Firewall_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "name":
+			out.Values[i] = ec._Firewall_name(ctx, field, obj)
+		case "host":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Firewall_host(ctx, field, obj)
+				return res
+			})
+		case "username":
+			out.Values[i] = ec._Firewall_username(ctx, field, obj)
+		case "password":
+			out.Values[i] = ec._Firewall_password(ctx, field, obj)
+		case "recordCount":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Firewall_recordCount(ctx, field, obj)
+				return res
+			})
+		case "pageRowCount":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Firewall_pageRowCount(ctx, field, obj)
+				return res
+			})
+		case "groups":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Firewall_groups(ctx, field, obj)
+				return res
+			})
+		case "createdAt":
+			out.Values[i] = ec._Firewall_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "modifiedAt":
+			out.Values[i] = ec._Firewall_modifiedAt(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -3399,12 +4316,43 @@ func (ec *executionContext) _Group(ctx context.Context, sel ast.SelectionSet, ob
 		case "id":
 			out.Values[i] = ec._Group_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
+		case "users":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Group_users(ctx, field, obj)
+				return res
+			})
 		case "name":
 			out.Values[i] = ec._Group_name(ctx, field, obj)
+		case "subnet":
+			out.Values[i] = ec._Group_subnet(ctx, field, obj)
 		case "maxCount":
 			out.Values[i] = ec._Group_maxCount(ctx, field, obj)
+		case "firewall":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Group_firewall(ctx, field, obj)
+				return res
+			})
+		case "createdAt":
+			out.Values[i] = ec._Group_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "modifiedAt":
+			out.Values[i] = ec._Group_modifiedAt(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -3431,12 +4379,6 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Mutation")
-		case "login":
-			out.Values[i] = ec._Mutation_login(ctx, field)
-		case "logout":
-			out.Values[i] = ec._Mutation_logout(ctx, field)
-		case "register":
-			out.Values[i] = ec._Mutation_register(ctx, field)
 		case "addRecords":
 			out.Values[i] = ec._Mutation_addRecords(ctx, field)
 		case "setRecords":
@@ -3505,7 +4447,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Query")
-		case "viewer":
+		case "users":
 			field := field
 			out.Concurrently(i, func() (res graphql.Marshaler) {
 				defer func() {
@@ -3513,7 +4455,66 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_viewer(ctx, field)
+				res = ec._Query_users(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
+		case "records":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_records(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
+		case "groups":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_groups(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
+		case "firewall":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_firewall(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
+			})
+		case "announcement":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_announcement(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
 				return res
 			})
 		case "__type":
@@ -3549,10 +4550,21 @@ func (ec *executionContext) _Record(ctx context.Context, sel ast.SelectionSet, o
 			}
 		case "name":
 			out.Values[i] = ec._Record_name(ctx, field, obj)
+		case "user":
+			out.Values[i] = ec._Record_user(ctx, field, obj)
 		case "group":
 			out.Values[i] = ec._Record_group(ctx, field, obj)
+		case "ipAddr":
+			out.Values[i] = ec._Record_ipAddr(ctx, field, obj)
 		case "macAddr":
 			out.Values[i] = ec._Record_macAddr(ctx, field, obj)
+		case "createdAt":
+			out.Values[i] = ec._Record_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "modifiedAt":
+			out.Values[i] = ec._Record_modifiedAt(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -3588,36 +4600,15 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			out.Values[i] = ec._User_studentID(ctx, field, obj)
 		case "role":
 			out.Values[i] = ec._User_role(ctx, field, obj)
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var viewerImplementors = []string{"Viewer"}
-
-func (ec *executionContext) _Viewer(ctx context.Context, sel ast.SelectionSet, obj *viewer.Viewer) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, viewerImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("Viewer")
-		case "user":
-			out.Values[i] = ec._Viewer_user(ctx, field, obj)
-		case "records":
-			out.Values[i] = ec._Viewer_records(ctx, field, obj)
-		case "groups":
-			out.Values[i] = ec._Viewer_groups(ctx, field, obj)
-		case "announcements":
-			out.Values[i] = ec._Viewer_announcements(ctx, field, obj)
+		case "password":
+			out.Values[i] = ec._User_password(ctx, field, obj)
+		case "createdAt":
+			out.Values[i] = ec._User_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "modifiedAt":
+			out.Values[i] = ec._User_modifiedAt(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -3874,13 +4865,50 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
-func (ec *executionContext) unmarshalNAddRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐAddRecordInput(ctx context.Context, v interface{}) (AddRecordInput, error) {
+func (ec *executionContext) unmarshalNAddRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋmanagerᚋgraphqlᚋgeneratedᚐAddRecordInput(ctx context.Context, v interface{}) (AddRecordInput, error) {
 	res, err := ec.unmarshalInputAddRecordInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalNAnnouncement2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋannouncementᚐAnnouncement(ctx context.Context, sel ast.SelectionSet, v announcement.Announcement) graphql.Marshaler {
 	return ec._Announcement(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNAnnouncement2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋannouncementᚐAnnouncementᚄ(ctx context.Context, sel ast.SelectionSet, v []announcement.Announcement) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNAnnouncement2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋannouncementᚐAnnouncement(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+	return ret
 }
 
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
@@ -3898,13 +4926,91 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
-func (ec *executionContext) unmarshalNDelRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐDelRecordInput(ctx context.Context, v interface{}) (DelRecordInput, error) {
+func (ec *executionContext) unmarshalNDelRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋmanagerᚋgraphqlᚋgeneratedᚐDelRecordInput(ctx context.Context, v interface{}) (DelRecordInput, error) {
 	res, err := ec.unmarshalInputDelRecordInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
+func (ec *executionContext) marshalNFirewall2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋmanagerᚐFirewall(ctx context.Context, sel ast.SelectionSet, v manager.Firewall) graphql.Marshaler {
+	return ec._Firewall(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNFirewall2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋmanagerᚐFirewallᚄ(ctx context.Context, sel ast.SelectionSet, v []manager.Firewall) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNFirewall2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋmanagerᚐFirewall(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+	return ret
+}
+
 func (ec *executionContext) marshalNGroup2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋgroupᚐGroup(ctx context.Context, sel ast.SelectionSet, v group.Group) graphql.Marshaler {
 	return ec._Group(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNGroup2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋgroupᚐGroupᚄ(ctx context.Context, sel ast.SelectionSet, v []group.Group) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNGroup2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋgroupᚐGroup(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+	return ret
 }
 
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v interface{}) (string, error) {
@@ -3943,17 +5049,12 @@ func (ec *executionContext) marshalNID2ᚖstring(ctx context.Context, sel ast.Se
 	return res
 }
 
-func (ec *executionContext) unmarshalNLoginInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐLoginInput(ctx context.Context, v interface{}) (user.LoginInput, error) {
-	res, err := ec.unmarshalInputLoginInput(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
-func (ec *executionContext) unmarshalNMacAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚋscalarsᚐMacAddr(ctx context.Context, v interface{}) (*scalars.MacAddr, error) {
+func (ec *executionContext) unmarshalNMacAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋbaseᚋscalarsᚐMacAddr(ctx context.Context, v interface{}) (*scalars.MacAddr, error) {
 	res, err := scalars.UnmarshalMacAddr(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNMacAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚋscalarsᚐMacAddr(ctx context.Context, sel ast.SelectionSet, v *scalars.MacAddr) graphql.Marshaler {
+func (ec *executionContext) marshalNMacAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋbaseᚋscalarsᚐMacAddr(ctx context.Context, sel ast.SelectionSet, v *scalars.MacAddr) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "must not be null")
@@ -3973,12 +5074,44 @@ func (ec *executionContext) marshalNRecord2githubᚗcomᚋcliffxzxᚋgieenmᚑto
 	return ec._Record(ctx, sel, &v)
 }
 
-func (ec *executionContext) unmarshalNRegisterInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐRegisterInput(ctx context.Context, v interface{}) (user.RegisterInput, error) {
-	res, err := ec.unmarshalInputRegisterInput(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
+func (ec *executionContext) marshalNRecord2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋrecordᚐRecordᚄ(ctx context.Context, sel ast.SelectionSet, v []record.Record) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNRecord2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋrecordᚐRecord(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+	return ret
 }
 
-func (ec *executionContext) unmarshalNSetRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚐSetRecordInput(ctx context.Context, v interface{}) (SetRecordInput, error) {
+func (ec *executionContext) unmarshalNSetRecordInput2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋmanagerᚋgraphqlᚋgeneratedᚐSetRecordInput(ctx context.Context, v interface{}) (SetRecordInput, error) {
 	res, err := ec.unmarshalInputSetRecordInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
@@ -3998,25 +5131,66 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 	return res
 }
 
-func (ec *executionContext) unmarshalNString2ᚖstring(ctx context.Context, v interface{}) (*string, error) {
-	res, err := graphql.UnmarshalString(v)
+func (ec *executionContext) unmarshalNTime2ᚖtimeᚐTime(ctx context.Context, v interface{}) (*time.Time, error) {
+	res, err := graphql.UnmarshalTime(v)
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNString2ᚖstring(ctx context.Context, sel ast.SelectionSet, v *string) graphql.Marshaler {
+func (ec *executionContext) marshalNTime2ᚖtimeᚐTime(ctx context.Context, sel ast.SelectionSet, v *time.Time) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "must not be null")
 		}
 		return graphql.Null
 	}
-	res := graphql.MarshalString(*v)
+	res := graphql.MarshalTime(*v)
 	if res == graphql.Null {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "must not be null")
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNUser2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐUser(ctx context.Context, sel ast.SelectionSet, v user.User) graphql.Marshaler {
+	return ec._User(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNUser2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐUserᚄ(ctx context.Context, sel ast.SelectionSet, v []user.User) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNUser2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐUser(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+	return ret
 }
 
 func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler {
@@ -4263,53 +5437,6 @@ func (ec *executionContext) marshalOAnnounceLevel2ᚖgithubᚗcomᚋcliffxzxᚋg
 	return announcement.MarshalAnnounceLevel(*v)
 }
 
-func (ec *executionContext) marshalOAnnouncement2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋannouncementᚐAnnouncementᚄ(ctx context.Context, sel ast.SelectionSet, v []announcement.Announcement) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNAnnouncement2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋannouncementᚐAnnouncement(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-	return ret
-}
-
-func (ec *executionContext) marshalOAuthPayload2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐAuthPayload(ctx context.Context, sel ast.SelectionSet, v *user.AuthPayload) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._AuthPayload(ctx, sel, v)
-}
-
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -4332,6 +5459,13 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 		return graphql.Null
 	}
 	return graphql.MarshalBoolean(*v)
+}
+
+func (ec *executionContext) marshalOFirewall2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋmanagerᚐFirewall(ctx context.Context, sel ast.SelectionSet, v *manager.Firewall) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Firewall(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOGroup2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋgroupᚐGroupᚄ(ctx context.Context, sel ast.SelectionSet, v []group.Group) graphql.Marshaler {
@@ -4396,6 +5530,21 @@ func (ec *executionContext) marshalOID2ᚖstring(ctx context.Context, sel ast.Se
 	return graphql.MarshalID(*v)
 }
 
+func (ec *executionContext) unmarshalOIPAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋbaseᚋscalarsᚐIPAddr(ctx context.Context, v interface{}) (*scalars.IPAddr, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := scalars.UnmarshalIPAddr(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOIPAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋbaseᚋscalarsᚐIPAddr(ctx context.Context, sel ast.SelectionSet, v *scalars.IPAddr) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return scalars.MarshalIPAddr(v)
+}
+
 func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v interface{}) (*int, error) {
 	if v == nil {
 		return nil, nil
@@ -4411,7 +5560,7 @@ func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.Sele
 	return graphql.MarshalInt(*v)
 }
 
-func (ec *executionContext) unmarshalOMacAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚋscalarsᚐMacAddr(ctx context.Context, v interface{}) (*scalars.MacAddr, error) {
+func (ec *executionContext) unmarshalOMacAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋbaseᚋscalarsᚐMacAddr(ctx context.Context, v interface{}) (*scalars.MacAddr, error) {
 	if v == nil {
 		return nil, nil
 	}
@@ -4419,51 +5568,11 @@ func (ec *executionContext) unmarshalOMacAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieen
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOMacAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋgraphqlᚋscalarsᚐMacAddr(ctx context.Context, sel ast.SelectionSet, v *scalars.MacAddr) graphql.Marshaler {
+func (ec *executionContext) marshalOMacAddr2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋbaseᚋscalarsᚐMacAddr(ctx context.Context, sel ast.SelectionSet, v *scalars.MacAddr) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return scalars.MarshalMacAddr(v)
-}
-
-func (ec *executionContext) marshalORecord2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋrecordᚐRecordᚄ(ctx context.Context, sel ast.SelectionSet, v []record.Record) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNRecord2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋrecordᚐRecord(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-	return ret
 }
 
 func (ec *executionContext) marshalORecord2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋfirewallᚋrecordᚐRecord(ctx context.Context, sel ast.SelectionSet, v *record.Record) graphql.Marshaler {
@@ -4563,18 +5672,51 @@ func (ec *executionContext) marshalOTime2ᚖtimeᚐTime(ctx context.Context, sel
 	return graphql.MarshalTime(*v)
 }
 
+func (ec *executionContext) marshalOUser2ᚕgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐUserᚄ(ctx context.Context, sel ast.SelectionSet, v []user.User) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNUser2githubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐUser(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+	return ret
+}
+
 func (ec *executionContext) marshalOUser2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋuserᚐUser(ctx context.Context, sel ast.SelectionSet, v *user.User) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._User(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOViewer2ᚖgithubᚗcomᚋcliffxzxᚋgieenmᚑtoolsᚋpkgᚋgieenmᚑsystemᚋviewerᚐViewer(ctx context.Context, sel ast.SelectionSet, v *viewer.Viewer) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._Viewer(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.EnumValue) graphql.Marshaler {

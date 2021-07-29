@@ -8,13 +8,15 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/base/scalars"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/cors"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/database"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/sync"
-	gql "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql"
+	gql "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/generated"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/resolvers"
-	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/scalars"
+	managerGQL "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/manager/graphql/generated"
+	managerResolver "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/manager/graphql/resolvers"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/seeder"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/validator"
 	"github.com/cliffxzx/gieenm-tools/pkg/utils"
@@ -84,6 +86,7 @@ func main() {
 	}
 
 	r.POST("/graphql", gin.WrapH(handler.NewDefaultServer(gql.NewExecutableSchema(gql.Config{Resolvers: &resolvers.Resolver{}}))))
+	r.POST("/manager", gin.WrapH(handler.NewDefaultServer(managerGQL.NewExecutableSchema(managerGQL.Config{Resolvers: &managerResolver.Resolver{}}))))
 
 	port := utils.MustGetEnv("PORT")
 

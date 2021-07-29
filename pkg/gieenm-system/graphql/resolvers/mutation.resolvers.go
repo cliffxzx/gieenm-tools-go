@@ -11,7 +11,7 @@ import (
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/group"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/record"
-	gql "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql"
+	gql1 "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/generated"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/user"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/validator"
 	"github.com/cliffxzx/gieenm-tools/pkg/utils"
@@ -83,7 +83,7 @@ func (r *mutationResolver) Register(ctx context.Context, input user.RegisterInpu
 	return &user.AuthPayload{User: register, Token: &tokenStr}, nil
 }
 
-func (r *mutationResolver) AddRecords(ctx context.Context, input gql.AddRecordInput) (*record.Record, error) {
+func (r *mutationResolver) AddRecords(ctx context.Context, input gql1.AddRecordInput) (*record.Record, error) {
 	gCtx, err := utils.GetGinContext(ctx)
 	if err != nil {
 		return nil, err
@@ -104,11 +104,11 @@ func (r *mutationResolver) AddRecords(ctx context.Context, input gql.AddRecordIn
 	return firewall.AddRecordsController(&rd)
 }
 
-func (r *mutationResolver) SetRecords(ctx context.Context, input gql.SetRecordInput) (*record.Record, error) {
+func (r *mutationResolver) SetRecords(ctx context.Context, input gql1.SetRecordInput) (*record.Record, error) {
 	panic(fmt.Errorf("not implemented"))
 }
 
-func (r *mutationResolver) DelRecords(ctx context.Context, input gql.DelRecordInput) (*record.Record, error) {
+func (r *mutationResolver) DelRecords(ctx context.Context, input gql1.DelRecordInput) (*record.Record, error) {
 	gCtx, err := utils.GetGinContext(ctx)
 	if err != nil {
 		return nil, err
@@ -127,7 +127,7 @@ func (r *mutationResolver) DelRecords(ctx context.Context, input gql.DelRecordIn
 	return firewall.DelRecordsController(&rd)
 }
 
-// Mutation returns gql.MutationResolver implementation.
-func (r *Resolver) Mutation() gql.MutationResolver { return &mutationResolver{r} }
+// Mutation returns gql1.MutationResolver implementation.
+func (r *Resolver) Mutation() gql1.MutationResolver { return &mutationResolver{r} }
 
 type mutationResolver struct{ *Resolver }

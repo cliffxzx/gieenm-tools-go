@@ -53,6 +53,15 @@ func (Sqls) Dels() string {
 `
 }
 
+func (Sqls) Gets() string {
+	return `
+	select
+		id, uid, nusoft_id, name, ip_addr, mac_addr, user_id, group_id, created_at, modified_at
+	from
+		records
+`
+}
+
 func (Sqls) GetsByUserID() string {
 	return `
 	select

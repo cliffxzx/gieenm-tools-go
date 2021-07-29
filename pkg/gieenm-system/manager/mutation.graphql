@@ -1,0 +1,22 @@
+type Mutation {
+  addRecords(input: AddRecordInput!): Record
+  setRecords(input: SetRecordInput!): Record
+  delRecords(input: DelRecordInput!): Record
+}
+
+input AddRecordInput {
+  groupID: ID!
+  name: String!
+  macAddr: MacAddr!
+}
+
+input SetRecordInput {
+  id: ID!
+  name: String
+  groupID: ID
+  macAddr: MacAddr
+}
+
+input DelRecordInput {
+  id: ID!
+}

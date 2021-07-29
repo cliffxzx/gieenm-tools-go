@@ -1,0 +1,61 @@
+type AutoSign implements Node {
+  id: ID!
+  startTime: Time
+  endTime: Time
+  content: String
+}
+
+type Record implements Node {
+  id: ID!
+  name: String
+  user: User
+  group: Group
+  ipAddr: IPAddr
+  macAddr: MacAddr
+  createdAt: Time!
+  modifiedAt: Time
+}
+
+type Group implements Node {
+  id: ID!
+  users: [User!]
+  name: String
+  subnet: IPAddr
+  firewall: Firewall
+  createdAt: Time!
+  modifiedAt: Time
+}
+
+type Firewall implements Node {
+  id: ID!
+  name: String
+  host: String
+  username: String
+  password: String
+  recordCount: Int
+  pageRowCount: Int
+  groups: [Group!]
+  createdAt: Time!
+  modifiedAt: Time
+}
+
+type User implements Node {
+  id: ID!
+  name: String
+  email: String
+  studentID: String
+  role: Role
+  password: String
+  createdAt: Time!
+  modifiedAt: Time
+}
+
+type Announcement implements Node {
+  id: ID!
+  title: String
+  content: String
+  announcer: String
+  createdAt: Time!
+  modifiedAt: Time
+  level: AnnounceLevel
+}

@@ -6,7 +6,7 @@ package resolvers
 import (
 	"context"
 
-	gql "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql"
+	gql1 "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/generated"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/viewer"
 )
 
@@ -14,7 +14,7 @@ func (r *queryResolver) Viewer(ctx context.Context) (*viewer.Viewer, error) {
 	return viewer.Controller(ctx)
 }
 
-// Query returns gql.QueryResolver implementation.
-func (r *Resolver) Query() gql.QueryResolver { return &queryResolver{r} }
+// Query returns gql1.QueryResolver implementation.
+func (r *Resolver) Query() gql1.QueryResolver { return &queryResolver{r} }
 
 type queryResolver struct{ *Resolver }

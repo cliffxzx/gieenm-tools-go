@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/base/scalars"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/database"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/common"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/group"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/limit"
-	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/scalars"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/user"
 	"github.com/cliffxzx/gieenm-tools/pkg/utils"
 )
@@ -203,6 +203,29 @@ func Dels(destSource *[]Record) error {
 	}
 
 	return nil
+}
+
+// Gets records
+func Gets() (*[]Record, error) {
+	records := []Record{}
+	converter := []struct {
+		Record
+		UserID  *int `db:"user_id"`
+		GroupID *int `db:"group_id"`
+	}{}
+
+	err := database.GetDB().Select(&converter, Sqls{}.Gets())
+	if err != nil {
+		return nil, err
+	}
+
+	for _, r := range converter {
+		r.Record.Group = &group.Group{ID: r.GroupID}
+		r.Record.User = &user.User{ID: r.UserID}
+		records = append(records, r.Record)
+	}
+
+	return &records, nil
 }
 
 // GetsByUserID record to database and return to parameter

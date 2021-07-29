@@ -1,10 +1,11 @@
 # Where are all the schema files located? globs are supported eg  src/**/*.graphqls
 schema:
-  - pkg/gieenm-system/graphql/schemas/*.graphql
+  - pkg/gieenm-system/base/base.graphql
+  - pkg/gieenm-system/manager/*.graphql
 
 # Where should the generated server code go?
 exec:
-  filename: pkg/gieenm-system/graphql/internal.go
+  filename: pkg/gieenm-system/manager/graphql/generated/internal.go
   package: gql
 
 # Uncomment to enable federation
@@ -14,20 +15,20 @@ exec:
 
 # Where should any generated models go?
 model:
-  filename: pkg/gieenm-system/graphql/models_example.go
+  filename: pkg/gieenm-system/manager/graphql/generated/models.go
   package: gql
 
 # Where should the resolver implementations go?
 resolver:
   layout: follow-schema
-  dir: pkg/gieenm-system/graphql/resolvers
+  dir: pkg/gieenm-system/manager/graphql/resolvers
   package: resolvers
 
 # Optional: turn on use `gqlgen:"fieldName"` tags in your models
 struct_tag: gqlgen
 
 # Optional: turn on to use []Thing instead of []*Thing
-omit_slice_element_pointers: false
+omit_slice_element_pointers: true
 
 # Optional: set to speed up generation time by not performing a final validation pass.
 # skip_validation: true
@@ -35,14 +36,14 @@ omit_slice_element_pointers: false
 # gqlgen will search for any type names in the schema in these go packages
 # if they match it will use them, otherwise it will generate them.
 autobind:
-  - "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/base"
+  - "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/base"
   - "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/announcement"
   - "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/viewer"
   - "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/user"
   - "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/authentication"
-  - "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall"
   - "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/record"
   - "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/group"
+  - "github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/manager"
 
 # This section declares type mapping between the GraphQL and go type systems
 #
@@ -65,22 +66,25 @@ models:
       - github.com/99designs/gqlgen/graphql.Int64
   Float:
     model:
-      - github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/scalars.Float
+      - github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/base/scalars.Float
   Float64:
     model:
       - github.com/99designs/gqlgen/graphql.Float
   Upload:
     model:
-      - github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/scalars.Upload
+      - github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/base/scalars.Upload
   IPAddr:
     model:
-      - github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/scalars.IPAddr
+      - github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/base/scalars.IPAddr
   MacAddr:
     model:
-      - github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/scalars.MacAddr
+      - github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/base/scalars.MacAddr
   Role:
     model:
       - github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/user.Role
   AnnounceLevel:
     model:
       - github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/announcement.AnnounceLevel
+  User:
+    model:
+      - github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/user.User

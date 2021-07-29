@@ -1,6 +1,0 @@
-type Sign implements Node {
-  id: ID!
-  startTime: Time
-  endTime: Time
-  content: String
-}

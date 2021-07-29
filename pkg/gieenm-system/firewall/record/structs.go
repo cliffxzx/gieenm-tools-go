@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/base/scalars"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/common"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/firewall/group"
-	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/graphql/scalars"
 	"github.com/cliffxzx/gieenm-tools/pkg/gieenm-system/user"
 	"github.com/cliffxzx/gieenm-tools/pkg/utils"
 )

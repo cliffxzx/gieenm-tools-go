@@ -16,14 +16,14 @@ type Role string
 //User ...
 type User struct {
 	ID         *int       `db:"id"`
-	UID        *string    `db:"uid" gqlgen:"id"`
+	UID        *string    `db:"uid"                 gqlgen:"id"`
 	Role       *Role      `db:"role,type:role_enum" gqlgen:"role"`
-	Name       *string    `db:"name" gqlgen:"name"`
-	Email      *string    `db:"email" gqlgen:"email"`
-	StudentID  *string    `db:"student_id" gqlgen:"studentID"`
-	Password   *string    `db:"password"`
-	CreatedAt  *time.Time `db:"created_at"`
-	ModifiedAt *time.Time `db:"modified_at"`
+	Name       *string    `db:"name"                gqlgen:"name"`
+	Email      *string    `db:"email"               gqlgen:"email"`
+	StudentID  *string    `db:"student_id"          gqlgen:"studentID"`
+	Password   *string    `db:"password"            gqlgen:"password"`
+	CreatedAt  *time.Time `db:"created_at"          gqlgen:"createdAt"`
+	ModifiedAt *time.Time `db:"modified_at"         gqlgen:"modifiedAt"`
 }
 
 // IsNode ...

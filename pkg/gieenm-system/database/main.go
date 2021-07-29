@@ -18,7 +18,8 @@ var db *sqlx.DB
 //Init ...
 func Init() {
 	dbInfo := fmt.Sprintf(
-		"user=%s password=%s dbname=%s sslmode=disable",
+		"host=%s user=%s password=%s dbname=%s sslmode=disable",
+		os.Getenv("DB_HOST"),
 		os.Getenv("DB_USER"),
 		os.Getenv("DB_PASS"),
 		os.Getenv("DB_NAME"),

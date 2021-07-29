@@ -45,15 +45,16 @@ func (u *URL) ToStdURL() *url.URL {
 // Firewall ...
 type Firewall struct {
 	ID         *int       `db:"id"`
-	UID        *string    `db:"uid"`
-	Name       *string    `db:"name"`
-	Host       *URL       `db:"host"`
-	Username   *string    `db:"username"`
-	Password   *string    `db:"password"`
-	CreatedAt  *time.Time `db:"created_at"`
-	ModifiedAt *time.Time `db:"modified_at"`
+	UID        *string    `db:"uid"         gqlgen:"id"`
+	Name       *string    `db:"name"        gqlgen:"name"`
+	Host       *URL       `db:"host"        gqlgen:"host"`
+	Username   *string    `db:"username"    gqlgen:"username"`
+	Password   *string    `db:"password"    gqlgen:"password"`
+	CreatedAt  *time.Time `db:"created_at"  gqlgen:"createdAt"`
+	ModifiedAt *time.Time `db:"modified_at" gqlgen:"modifiedAt"`
 	Nusoft     *nusoft.Firewall
 }
+
 
 // String ...
 func (f Firewall) String() string {

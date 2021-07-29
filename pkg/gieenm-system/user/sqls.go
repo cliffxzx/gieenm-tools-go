@@ -55,6 +55,17 @@ WHERE
 	return sql, nil
 }
 
+func (Sqls) Gets() string {
+	sql := `
+select
+	id, uid, name, role, email, student_id, password, created_at, modified_at
+from
+	users
+`
+
+	return sql
+}
+
 // Add ...
 func (Sqls) Add() (string, error) {
 	return `
